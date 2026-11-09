@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 构建/测试临时产物（不该进仓库）
+dist/
+_shot*.png
+_smoke*/
+__prof*/
+
+# 系统垃圾
+.DS_Store
+Thumbs.db
+desktop.ini

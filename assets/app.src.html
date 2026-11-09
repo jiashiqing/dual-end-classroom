@@ -1,0 +1,1644 @@
+<!DOCTYPE html>
+<!-- v2 · 2026-11-09 · 课前设置（课堂码+二维码）/ 自定义组数 / 每关独立时长 / 进度墙+全屏看板 / 证书门闩 -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>双端课堂 · __ROLE_LABEL__ · v2</title>
+<style>
+/* 骨架样式：1366×768 起步，正文 ≥16px，主按钮 ≥18px */
+:root{
+  --bg:#f2f6f3; --panel:#ffffff; --ink:#17281f; --muted:#66796e;
+  --main:#16794f; --main-2:#0f5c3b; --accent:#d97a12; --line:#d9e5dd;
+  --ok:#1a8f5e; --warn:#c2410c;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%}
+body{
+  background:var(--bg);color:var(--ink);
+  font:16px/1.6 "Microsoft YaHei","PingFang SC",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+button{font:inherit;cursor:pointer}
+.page{display:none;min-height:100%}
+.page.on{display:block}
+
+/* ---------- 角色页（只在源码里出现，构建后删掉） ---------- */
+#pg-role{display:none}
+#pg-role.on{display:grid;place-items:center;padding:32px 20px}
+.role-wrap{width:100%;max-width:920px;text-align:center}
+.role-title{font-size:26px;font-weight:700;letter-spacing:.5px}
+.role-sub{color:var(--muted);margin-top:6px;font-size:14px}
+.role-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:18px;margin-top:28px}
+.role-card{
+  background:var(--panel);border:1px solid var(--line);border-radius:16px;
+  padding:26px 20px;cursor:pointer;transition:.16s;
+}
+.role-card:hover{border-color:var(--main);box-shadow:0 8px 24px rgba(22,121,79,.12);transform:translateY(-2px)}
+.role-card .ic{font-size:34px;line-height:1}
+.role-card h3{margin:10px 0 6px;font-size:19px;letter-spacing:3px}
+.role-card p{margin:0;color:var(--muted);font-size:14px}
+
+/* ---------- 通用 ---------- */
+.btn{
+  display:inline-block;padding:11px 18px;border-radius:11px;border:1px solid transparent;
+  background:var(--main);color:#fff;font-size:16px;font-weight:700;
+}
+.btn:hover{background:var(--main-2)}
+.btn.ghost{background:transparent;color:var(--muted);border-color:var(--line);font-weight:400}
+.btn.ghost:hover{color:var(--ink);border-color:var(--muted);background:transparent}
+.btn.sm{padding:7px 13px;font-size:14px;border-radius:9px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.pill{padding:5px 12px;border-radius:999px;background:#eef4f0;color:var(--main-2);font-size:14px;font-weight:700;white-space:nowrap}
+.spacer{flex:1 1 auto;min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px 18px}
+.card h3{margin:0;font-size:19px}
+.card h4{margin:0 0 8px;font-size:15px;color:var(--muted);font-weight:700;letter-spacing:1px}
+.ph-sub{color:var(--muted);font-size:13px}
+.empty{color:var(--muted);font-size:14px;padding:14px 0;text-align:center}
+#toast{
+  position:fixed;left:50%;bottom:28px;transform:translate(-50%,12px);
+  background:rgba(23,40,31,.92);color:#fff;padding:10px 20px;border-radius:999px;
+  font-size:15px;opacity:0;pointer-events:none;transition:.2s;z-index:90;max-width:90vw;
+}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* ---------- 学生报到 ---------- */
+#pg-join.on{display:grid;place-items:center;padding:32px 20px}
+.join-wrap{width:100%;max-width:460px;background:var(--panel);border:1px solid var(--line);
+  border-radius:18px;padding:26px 26px;box-shadow:0 10px 30px rgba(23,40,31,.06)}
+.join-wrap h2{margin:0 0 4px;font-size:22px}
+.join-wrap .hint{color:var(--muted);font-size:14px;margin-bottom:16px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:14px;color:var(--muted);margin-bottom:6px}
+.field input{
+  width:100%;padding:11px 13px;font:inherit;border:1px solid var(--line);
+  border-radius:10px;background:#fbfdfb;outline:none;
+}
+.field input:focus{border-color:var(--main);box-shadow:0 0 0 3px rgba(22,121,79,.12)}
+/* 组按钮数量是 2~12 个都是变数，不能写死 8 列 */
+.grp-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(38px,1fr));gap:8px}
+.grp{
+  padding:9px 0;text-align:center;border:1px solid var(--line);border-radius:9px;
+  background:#fbfdfb;font-size:15px;transition:.14s;
+}
+.grp.on{background:var(--main);border-color:var(--main);color:#fff;font-weight:700}
+
+/* ---------- 学生闯关 ---------- */
+.topbar{
+  position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;
+  padding:10px 18px;background:rgba(255,255,255,.94);border-bottom:1px solid var(--line);
+  backdrop-filter:blur(6px);flex-wrap:nowrap;
+}
+.topbar .who{font-weight:700;white-space:nowrap}
+.topbar .who small{color:var(--muted);font-weight:400;margin-left:8px}
+.dot{width:9px;height:9px;border-radius:50%;background:#c2cdc6;display:inline-block;margin-right:6px}
+.dot.on{background:var(--ok);box-shadow:0 0 0 3px rgba(26,143,94,.16)}
+.timer{font-variant-numeric:tabular-nums;font-weight:700;font-size:17px;color:var(--main-2);white-space:nowrap}
+.timer.warn{color:var(--warn)}
+.map{display:flex;gap:10px;padding:16px 18px 0;flex-wrap:wrap}
+.chip{
+  display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:11px;
+  border:1px solid var(--line);background:var(--panel);font-size:15px;color:var(--muted);
+}
+.chip .no{font-weight:700;color:var(--ink)}
+.chip.cur{border-color:var(--main);color:var(--ink);box-shadow:0 0 0 3px rgba(22,121,79,.1)}
+.chip.done{border-color:var(--ok);background:#eff9f3;color:var(--ok)}
+.chip.lock{opacity:.5}
+.wrap{max-width:860px;margin:0 auto;padding:18px}
+.card .sub{color:var(--muted);font-size:14px;margin-bottom:16px}
+.q{margin:0 0 18px}
+.q .qq{font-weight:700;margin-bottom:10px}
+.opts{display:grid;gap:9px}
+.opt{
+  text-align:left;padding:12px 14px;border:1px solid var(--line);border-radius:11px;
+  background:#fbfdfb;font-size:15px;transition:.14s;
+}
+.opt:hover{border-color:var(--main)}
+.opt.on{border-color:var(--main);background:#eef8f2;font-weight:700}
+.opt.right{border-color:var(--ok);background:#e9f8f0;font-weight:700}
+.opt.wrong{border-color:#dc2626;background:#fdeeee}
+.foot-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.foot-row .msg{font-size:14px;color:var(--muted)}
+
+/* ---------- 教师端骨架 ---------- */
+#pg-teacher.on{display:flex;flex-direction:column;height:100vh;min-height:0}
+#t-tabs{display:flex;gap:6px;padding:10px 18px 0;border-bottom:1px solid var(--line);background:var(--panel);flex:0 0 auto}
+#t-tabs button{
+  padding:9px 20px;border:1px solid transparent;border-bottom:none;border-radius:10px 10px 0 0;
+  background:transparent;color:var(--muted);font-size:16px;
+}
+#t-tabs button.on{background:var(--bg);border-color:var(--line);color:var(--ink);font-weight:700;margin-bottom:-1px}
+.t-body{flex:1 1 auto;min-height:0;padding:14px 18px;overflow:hidden}
+.tab{display:none;height:100%;min-height:0}
+.tab.on{display:block}
+
+/* ---------- 大屏：左进度墙 / 右排行榜+举手 ---------- */
+.board{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;height:100%;min-height:0}
+@media (max-width:1100px){.board{grid-template-columns:minmax(0,1fr)}}
+.board-main{
+  display:flex;flex-direction:column;min-height:0;min-width:0;
+  background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 16px;
+}
+.ph{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex:0 0 auto;margin-bottom:10px}
+.ph-l{min-width:0}
+.bd-title{display:flex;align-items:baseline;gap:6px;min-width:0}
+/* 课程名只能是单行：副标题一换行就会顶到下面的面板上 */
+.sub-course{
+  display:inline-block;max-width:420px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:20px;font-weight:700;color:var(--main-2);vertical-align:bottom;
+}
+.bd-title em{font-style:normal;color:var(--muted);font-size:14px;white-space:nowrap}
+/* 进度墙：行高等分，表头不参与均分；>9 组加 .dense 收字号 */
+.wall{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:6px}
+.wrow{flex:1 1 0;min-height:0;display:flex;gap:6px;align-items:stretch}
+.wrow.wh{flex:0 0 auto}
+.wg{flex:0 0 62px;display:grid;place-items:center;font-size:14px;font-weight:700;color:var(--main-2);
+  background:#eef4f0;border-radius:8px;overflow:hidden}
+.whd{flex:1 1 0;min-width:0;text-align:center;font-size:12px;color:var(--muted)}
+.wcell{flex:1 1 0;min-width:0;position:relative;border-radius:8px;background:#f1f6f3;overflow:hidden;display:grid;place-items:center}
+.wcell i{position:absolute;left:0;right:0;bottom:0;background:#bfe6d2;display:block}
+.wcell b{position:relative;font-size:22px;font-variant-numeric:tabular-nums;color:#12442f;line-height:1}
+.wcell.has b{color:#0b3a26}
+.wtot{flex:0 0 58px;display:grid;place-items:center;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.wall.dense .wrow{gap:4px}
+.wall.dense .wcell b{font-size:16px}
+.wall.dense .wg{font-size:12px}
+.kpi-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;flex:0 0 auto;margin-top:10px}
+.kpi{display:flex;align-items:baseline;gap:8px;padding:8px 14px;background:#f7fbf8;border:1px solid var(--line);border-radius:12px;min-width:0}
+.kpi em{font-style:normal;color:var(--muted);font-size:14px;white-space:nowrap}
+.kpi b{font-size:30px;line-height:1.2;color:var(--main-2);font-variant-numeric:tabular-nums}
+.kpi i{font-style:normal;color:var(--muted);font-size:13px}
+.bcol{display:flex;flex-direction:column;gap:12px;min-height:0;min-width:0}
+.rc{flex:1 1 0;min-height:0;display:flex;flex-direction:column}
+#t-rank{list-style:none;margin:0;padding:0;overflow:hidden}
+#t-rank li{display:flex;gap:8px;align-items:baseline;padding:5px 0;border-bottom:1px dashed var(--line);font-size:14px;white-space:nowrap}
+#t-rank li:last-child{border-bottom:none}
+#t-rank .rk{flex:0 0 18px;color:var(--muted);font-variant-numeric:tabular-nums}
+#t-rank .nm{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+#t-rank .dg{flex:0 0 auto;color:var(--ok);font-weight:700}
+.hc{flex:0 0 auto}
+#t-help .hp{display:flex;align-items:center;gap:8px;font-size:14px;padding:3px 0}
+.help-dot{width:8px;height:8px;border-radius:50%;background:#e11d48;display:inline-block;flex:0 0 auto}
+
+/* ---------- 全屏看板（详情） ---------- */
+.wo-mask{position:fixed;inset:0;z-index:80;background:var(--bg);display:flex;flex-direction:column;padding:16px 20px}
+.wo-top{display:flex;align-items:center;gap:14px;flex:0 0 auto;margin-bottom:12px;flex-wrap:wrap}
+.wo-top h3{margin:0;font-size:20px}
+.wo-kv{display:flex;gap:10px;flex-wrap:wrap}
+.wo-body{
+  flex:1 1 auto;min-height:0;overflow:auto;display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-content:start;
+}
+@media (max-width:900px){.wo-body{grid-template-columns:minmax(0,1fr)}}
+.wo-g{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:11px 13px;min-width:0}
+.wo-g h5{margin:0 0 8px;font-size:15px;display:flex;align-items:baseline;gap:8px}
+.wo-g h5 span{font-weight:400;color:var(--muted);font-size:12px}
+.wo-stus{display:flex;flex-wrap:wrap;gap:8px}
+.wo-empty{color:var(--muted);font-size:13px}
+.wc{flex:1 1 150px;max-width:230px;min-width:0;border:1px solid var(--line);border-radius:10px;padding:7px 9px;background:#fbfdfb}
+.wc.full{border-color:#d9b64a;background:#fdf8e6}
+.wc.off{opacity:.5}
+.wc .nm{font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wc .bar{display:flex;gap:2px;margin:6px 0 4px}
+.wc .bar i{flex:1 1 0;height:5px;border-radius:3px;background:#e3ece7}
+.wc .bar i.on{background:var(--main)}
+.wc .mt{font-size:12px;color:var(--muted)}
+
+/* ---------- 学情 ---------- */
+#tab-data.on{overflow:auto}
+.dh{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.dh .ph-sub{flex:1 1 auto;min-width:0}
+.lv-bars{display:grid;gap:7px;margin:10px 0 16px}
+.lv-bar{display:grid;grid-template-columns:64px minmax(0,1fr) 54px;gap:10px;align-items:center;font-size:13px;color:var(--muted)}
+.lv-bar .tr{height:9px;border-radius:5px;background:#e3ece7;overflow:hidden}
+.lv-bar .tr i{display:block;height:100%;background:var(--main)}
+table.roster{width:100%;border-collapse:collapse;font-size:14px}
+table.roster th,table.roster td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left}
+table.roster th{color:var(--muted);font-weight:400;font-size:13px}
+table.roster tr:hover td{background:#fbfdfb}
+
+/* ---------- 控制台（运行 / 课前设置 两视图） ---------- */
+#tab-ctrl.on{display:flex;flex-direction:column;min-height:0}
+.ctrl-head{display:flex;align-items:center;gap:10px;flex:0 0 auto;margin-bottom:12px;flex-wrap:wrap}
+.seg{display:flex;gap:4px;background:#e8f0eb;border-radius:10px;padding:3px}
+.seg button{border:0;background:transparent;padding:6px 14px;border-radius:8px;color:var(--muted);font-size:14px}
+.seg button.on{background:#fff;color:var(--ink);font-weight:700;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.cv{flex:1 1 auto;min-height:0;overflow:auto}
+.lv-list{display:flex;flex-direction:column;gap:8px;margin:12px 0 4px}
+.lv-row{display:flex;align-items:center;gap:12px;padding:7px 12px;border:1px solid var(--line);border-radius:10px;background:#fbfdfb;cursor:pointer}
+.lv-row.on{border-color:var(--main);background:#eef8f2}
+.lv-row .no{font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.lv-row .nm{flex:1 1 auto;min-width:0;font-size:14px}
+.lv-row .nm em{font-style:normal;color:var(--muted);font-size:12px;margin-left:8px}
+.lv-row .sw{width:38px;height:22px;border-radius:11px;background:#d7e3dc;position:relative;flex:0 0 auto;transition:.15s}
+.lv-row .sw::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.15s}
+.lv-row.on .sw{background:var(--main)}
+.lv-row.on .sw::after{left:18px}
+.gcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.gcard{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:11px 13px}
+.gcard .gt{display:flex;align-items:center;justify-content:space-between;font-weight:700;font-size:15px}
+.gcard .gt small{color:var(--muted);font-weight:400}
+.gcard .gsc{font-size:24px;font-weight:700;color:var(--main);font-variant-numeric:tabular-nums}
+.gcard .gm{color:var(--muted);font-size:12px;margin-top:2px;min-height:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gcard .ops{display:flex;gap:6px;margin-top:8px}
+.gcard .ops button{flex:1 1 auto;padding:5px 0;border-radius:8px;border:1px solid var(--line);background:#fbfdfb;font-size:13px}
+.gcard .ops button:hover{border-color:var(--main);color:var(--main)}
+.gcard .ops button.minus:hover{border-color:var(--warn);color:var(--warn)}
+/* 课前设置三块面板 */
+.set-grid{display:grid;grid-template-columns:340px minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:900px){.set-grid{grid-template-columns:minmax(0,1fr)}}
+.sp{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:13px 16px;min-width:0}
+.sp h4{margin:0 0 3px;font-size:16px;color:var(--ink);letter-spacing:0}
+.sp .sub{color:var(--muted);font-size:13px;margin-bottom:10px}
+.code-big{font:700 58px/1.1 ui-monospace,Consolas,monospace;letter-spacing:10px;text-align:center;color:var(--main-2);padding:4px 0 2px}
+.qr-box{width:172px;height:172px;margin:6px auto;background:#fff;border:1px solid var(--line);border-radius:10px;padding:5px;display:grid;place-items:center}
+.qr-box.none{display:none}
+.qr-box canvas{width:100%;height:100%;display:block;image-rendering:pixelated}
+.qr-tip{text-align:center;color:var(--muted);font-size:13px}
+.stu-url{margin-top:8px;text-align:center}
+/* 地址长度是变数（192.168.3.87 与 192.168.100.100 差 4 个字符），绝不折行 */
+.stu-url #stuUrlTx{display:block;font:700 18px/1.35 ui-monospace,Consolas,monospace;color:var(--main-2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stu-url.warn #stuUrlTx{color:var(--accent)}
+.stu-url small{color:var(--muted);font-size:12px}
+.set-row{display:flex;align-items:center;gap:12px;margin:11px 0;flex-wrap:wrap}
+.set-row>label{flex:0 0 84px;color:var(--muted);font-size:14px}
+.set-row input[type=text],.set-row input:not([type]){
+  flex:1 1 180px;min-width:0;padding:8px 11px;font:inherit;border:1px solid var(--line);border-radius:9px;background:#fbfdfb;outline:none;
+}
+.set-row input:focus{border-color:var(--main);box-shadow:0 0 0 3px rgba(22,121,79,.12)}
+.grp-pick{display:flex;gap:7px;align-items:center;flex-wrap:wrap;flex:1 1 auto}
+.gp{padding:6px 13px;border-radius:9px;border:1px solid var(--line);background:#fbfdfb;font-size:14px;color:var(--muted)}
+.gp.on{background:var(--main);border-color:var(--main);color:#fff;font-weight:700}
+.gp-lb{font-size:13px;color:var(--muted)}
+#stGrpN{width:60px;padding:6px 8px;font:inherit;border:1px solid var(--line);border-radius:9px;background:#fbfdfb;text-align:center}
+.mins{display:flex;gap:7px;flex-wrap:wrap;flex:1 1 auto}
+.min-cell{display:flex;flex-direction:column;align-items:center;gap:3px}
+.min-cell em{font-style:normal;font-size:11px;color:var(--muted)}
+.min-cell input{width:62px;padding:6px 4px;text-align:center;font:inherit;border:1px solid var(--line);border-radius:9px;background:#fbfdfb}
+.min-cell.now input{border-color:var(--main);box-shadow:0 0 0 3px rgba(22,121,79,.12)}
+.chk{display:flex;align-items:center;gap:9px;margin:9px 0;font-size:14px;color:var(--ink);cursor:pointer}
+.chk input{width:17px;height:17px;accent-color:var(--main)}
+
+/* ---------- 证书 ---------- */
+.cert-mask{position:fixed;inset:0;background:rgba(23,40,31,.5);display:none;place-items:center;z-index:50;padding:20px}
+.cert-mask.on{display:grid}
+.cert-box{background:#fffdf7;border:3px double var(--main);border-radius:14px;padding:28px 34px;max-width:560px;text-align:center}
+.cert-box h2{margin:0 0 6px;font-size:24px;letter-spacing:6px;color:var(--main-2)}
+.cert-box .nm{font-size:30px;font-weight:700;margin:12px 0;letter-spacing:4px}
+.cert-box .tx{color:var(--muted);font-size:14px;line-height:2}
+/* 证书按钮：没通关时压暗但不隐藏——学生得知道有这张证可领 */
+.btn.locked{opacity:.4;cursor:not-allowed}
+</style>
+</head>
+<body>
+
+<!-- ============ 角色选择（仅源码页保留；构建后两端各自直达） ============ -->
+<!-- #if DEMO -->
+<div class="page" id="pg-role">
+  <div class="role-wrap">
+    <div class="role-title">双端课堂 · 教师端 / 学生端</div>
+    <div class="role-sub">同一份源码，构建出两个角色文件</div>
+    <div class="role-cards">
+      <div class="role-card" id="rc-teacher">
+        <div class="ic">🧑‍🏫</div>
+        <h3>教 师 端</h3>
+        <p>课堂码+二维码 · 进度墙 · 放行 · 计时 · 加分 · 学情导出</p>
+      </div>
+      <div class="role-card" id="rc-student">
+        <div class="ic">🧒</div>
+        <h3>学 生 端</h3>
+        <p>输入课堂码或扫码报到 · 逐关闯关 · 全通关领证书</p>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- #endif -->
+
+<!-- ============ 学生报到 ============ -->
+<!-- #if S -->
+<div class="page" id="pg-join">
+  <div class="join-wrap">
+    <h2>入堂报到</h2>
+    <div class="hint">输入老师投屏上的 4 位课堂码，或直接扫二维码</div>
+    <div class="field">
+      <label for="j-code">课堂码</label>
+      <input id="j-code" inputmode="numeric" maxlength="4" placeholder="4 位数字">
+    </div>
+    <div class="field">
+      <label>你在第几组</label>
+      <div class="grp-row" id="j-groups"></div>
+    </div>
+    <div class="field">
+      <label for="j-name">姓名</label>
+      <input id="j-name" maxlength="12" placeholder="真实姓名，用于登记">
+    </div>
+    <button class="btn" id="j-go" style="width:100%">进入课堂</button>
+    <div class="hint" id="j-msg" style="margin:12px 0 0;min-height:20px"></div>
+  </div>
+</div>
+
+<!-- ============ 学生闯关 ============ -->
+<div class="page" id="pg-student">
+  <div class="topbar">
+    <span class="who" id="s-who">—<small id="s-grp"></small></span>
+    <span class="pill" id="s-course">双端课堂</span>
+    <span class="spacer"></span>
+    <span><span class="dot" id="s-net"></span><span id="s-net-tx">离线</span></span>
+    <span class="pill" id="s-round">第 1 关</span>
+    <span class="timer" id="s-timer">--:--</span>
+    <button class="btn ghost sm locked" id="s-cert-nav">🏅 证书</button>
+  </div>
+  <div class="map" id="s-map"></div>
+  <div class="wrap">
+    <div class="card" id="s-task"></div>
+  </div>
+</div>
+<!-- #endif -->
+
+<!-- ============ 教师端 ============ -->
+<!-- #if T -->
+<div class="page" id="pg-teacher">
+  <div id="t-tabs">
+    <button data-tab="board" class="on">大屏</button>
+    <button data-tab="data">学情</button>
+    <button data-tab="ctrl">控制台</button>
+  </div>
+  <div class="t-body">
+
+    <!-- ---- 大屏：进度墙 + KPI + 排行榜/举手 ---- -->
+    <div class="tab on" id="tab-board">
+      <div class="board">
+        <div class="board-main">
+          <div class="ph">
+            <div class="ph-l">
+              <div class="bd-title"><span class="sub-course" id="bdTitle">双端课堂</span><em>· 谁到哪一关，一眼看清</em></div>
+              <div class="ph-sub">格内数字＝该组已到这一关的人数，绿柱＝比例 · 课堂码在「控制台 · 课前设置」</div>
+            </div>
+            <span class="pill" id="t-net-wrap" title="课堂同步连接状态"><span class="dot" id="t-net"></span><span id="t-net-tx">离线</span></span>
+            <button class="btn ghost sm" id="btnWallAll">⛶ 详情</button>
+          </div>
+          <div class="wall" id="wall"></div>
+          <div class="kpi-row">
+            <div class="kpi"><em>在线</em><b id="t-online">0</b><i>人</i></div>
+            <div class="kpi"><em>已通关</em><b id="t-done">0</b><i>人</i></div>
+            <div class="kpi"><em>平均关数</em><b id="t-avg">0.0</b></div>
+          </div>
+        </div>
+        <div class="bcol">
+          <div class="card rc"><h4>实时排行榜</h4><ol id="t-rank"></ol></div>
+          <div class="card hc"><h4>举手求助</h4><div id="t-help"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ---- 学情 ---- -->
+    <div class="tab" id="tab-data">
+      <div class="card">
+        <div class="dh">
+          <h3>学情</h3>
+          <span class="ph-sub">全部来自学生端上报，下课导走，别指望下次打开还在</span>
+          <button class="btn sm" id="t-csv">导出 CSV</button>
+          <span class="msg ph-sub" id="t-csv-msg"></span>
+        </div>
+        <div class="ph-sub">每关通过人数</div>
+        <div class="lv-bars" id="t-lvbars"></div>
+        <table class="roster">
+          <thead><tr><th>姓名</th><th>组</th><th>已过关</th><th>得分</th><th>状态</th><th>最后活跃</th></tr></thead>
+          <tbody id="t-data-body"></tbody>
+        </table>
+        <div class="empty" id="t-data-empty">还没有学生进来</div>
+      </div>
+    </div>
+
+    <!-- ---- 控制台：运行 / 课前设置 ---- -->
+    <div class="tab" id="tab-ctrl">
+      <div class="ctrl-head">
+        <span class="pill" id="ctRound">第 1 关 · 12:00</span>
+        <span class="pill" id="ctOpen">已开放 1 / 5 关</span>
+        <span class="spacer"></span>
+        <div class="seg" id="cvSeg">
+          <button data-cv="run" class="on">课堂运行</button>
+          <button data-cv="cfg">课前设置</button>
+        </div>
+      </div>
+
+      <div class="cv" id="cvRun">
+        <div class="card" style="margin-bottom:12px">
+          <div class="dh">
+            <h3>课堂运行</h3>
+            <span class="ph-sub">放行＝允许学生进入第 N 关；加分直接下发到小组</span>
+          </div>
+          <div class="foot-row">
+            <button class="btn" id="t-open">放行下一关</button>
+            <button class="btn ghost" id="t-timer">▶ 开始计时</button>
+            <button class="btn ghost" id="t-add5">+5 分钟</button>
+            <button class="btn ghost" id="t-zero">计时归零</button>
+            <button class="btn ghost" id="t-reset">清空课堂数据</button>
+          </div>
+          <div class="lv-list" id="lvCtrl"></div>
+        </div>
+        <div class="gcards" id="t-groups"></div>
+      </div>
+
+      <div class="cv" id="cvCfg" hidden>
+        <div class="set-grid">
+          <div class="sp">
+            <h4>课堂码 · 扫码进课堂</h4>
+            <div class="sub">上课前亮一次，学生都进来就不用占屏了</div>
+            <div class="code-big" id="t-code">----</div>
+            <div class="qr-box" id="qrBox"><canvas id="qrCv" width="240" height="240">二维码</canvas></div>
+            <div class="qr-tip" id="qrTip">扫码直接进学生端，或输 4 位码</div>
+            <div class="stu-url" id="stuUrl">
+              <span id="stuUrlTx">教师机地址待确认</span>
+              <small>学生机浏览器输入这个地址</small>
+            </div>
+            <button class="btn ghost sm" id="t-newcode" style="width:100%;margin-top:8px">换一个课堂码</button>
+          </div>
+          <div>
+            <div class="sp" style="margin-bottom:12px">
+              <h4>基本设置</h4>
+              <div class="sub">改完立刻生效，不用重建、不用重启</div>
+              <div class="set-row">
+                <label for="stCourse">课程名称</label>
+                <input id="stCourse" maxlength="24" placeholder="例如：图像识别 · 五年级三班">
+              </div>
+              <div class="set-row">
+                <label>分组数</label>
+                <div class="grp-pick" id="stGroups">
+                  <button class="gp" data-g="4">4 组</button>
+                  <button class="gp" data-g="6">6 组</button>
+                  <button class="gp" data-g="8">8 组</button>
+                  <label class="gp-lb" for="stGrpN">自定义</label>
+                  <input id="stGrpN" type="number" min="2" max="12" step="1" inputmode="numeric" aria-label="自定义组数">
+                </div>
+              </div>
+              <div class="set-row">
+                <label>每关时长</label>
+                <div class="mins" id="stMins"></div>
+              </div>
+              <div class="ph-sub" style="margin-top:4px">单位：分钟，1–90。计时跟着「当前关」走，放行新关才换成那一关的时长。</div>
+            </div>
+            <div class="sp">
+              <h4>投屏与规则</h4>
+              <div class="sub">影响大屏和学生端，随时可改</div>
+              <label class="chk"><input type="checkbox" id="stJump"><span>允许跳关（已放行的关都能点）</span></label>
+              <label class="chk"><input type="checkbox" id="stReal"><span>大屏排行榜显示真实姓名</span></label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ---- 全屏看板：每组每位同学的进度 ---- -->
+<div class="wo-mask" id="wallOv" hidden>
+  <div class="wo-top">
+    <h3>全班闯关进度</h3>
+    <div class="wo-kv">
+      <span class="pill">在线 <b id="woOnline">0</b> 人</span>
+      <span class="pill">已通关 <b id="woDone">0</b> 人</span>
+      <span class="pill">平均 <b id="woAvg">0.0</b> 关</span>
+    </div>
+    <span class="spacer"></span>
+    <button class="btn ghost sm" id="woClose">✕ 关闭（Esc）</button>
+  </div>
+  <div class="wo-body" id="woBody"></div>
+</div>
+<!-- #endif -->
+
+<!-- ============ 证书 ============ -->
+<!-- #if S -->
+<div class="cert-mask" id="s-cert">
+  <div class="cert-box">
+    <h2>结 业 证 书</h2>
+    <div class="tx">兹证明</div>
+    <div class="nm" id="cert-name">—</div>
+    <div class="tx" id="cert-body">已完成全部关卡，特发此证。</div>
+    <div class="foot-row" style="justify-content:center;margin-top:18px">
+      <button class="btn" id="cert-save">保存图片</button>
+      <button class="btn ghost" id="cert-close">关闭</button>
+    </div>
+  </div>
+</div>
+<!-- #endif -->
+
+<script src="qr.js"></script>
+<script>
+'use strict';
+window.__ROLE__ = '';
+const ROLE = (typeof window.__ROLE__ === 'string') ? window.__ROLE__ : '';
+
+/* ================= 配置（换课程主要改这里） ================= */
+const CONFIG = {
+  APP: '双端课堂',
+  GROUP_MIN: 2,
+  GROUP_MAX: 12,
+  LEVELS: [
+    { id: 1, name: '第一关', sub: '热身' },
+    { id: 2, name: '第二关', sub: '练习' },
+    { id: 3, name: '第三关', sub: '挑战' },
+    { id: 4, name: '第四关', sub: '综合' },
+    { id: 5, name: '第五关', sub: '出师' }
+  ],
+  /* 每关默认时长（分钟），数组长度必须等于 LEVELS 长度。
+     不要退回「一个全局 TIME_SEC」——课上五关的节奏本来就不一样。 */
+  MINS: [10, 12, 15, 12, 8],
+  HB_MS: 3000,          // 教师心跳间隔
+  OFFLINE_MS: 14000,    // 多久没消息算离线
+  PING_MS: 8000,        // 学生保活间隔（必须 < OFFLINE_MS）
+  LOBBY: 'de_v1_lobby', // 大厅频道：报到页靠它拿到老师的真实组数
+  RELAY_KEY: 'de_classroom_relay'
+};
+
+const DEFAULTS = {
+  cfg: { title: '', groups: 8, mins: CONFIG.MINS.slice(), jump: false, real: true }
+};
+
+/* ================= 工具 ================= */
+const $ = s => document.querySelector(s);
+const $$ = s => Array.prototype.slice.call(document.querySelectorAll(s));
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pad2 = n => (n < 10 ? '0' : '') + n;
+const fmt = s => pad2(Math.floor(Math.max(0, s) / 60)) + ':' + pad2(Math.max(0, s) % 60);
+const rnd4 = () => String(1000 + Math.floor(Math.random() * 9000));
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+/* 只在内容真的变了才写 innerHTML：
+   大屏每 3 秒重绘一次，无条件赋值会把滚动位置反复拉回顶部，还会闪。 */
+function setHTML(el, html) {
+  if (!el) return false;
+  if (el.__h === html) return false;
+  el.__h = html;
+  el.innerHTML = html;
+  return true;
+}
+
+function toast(msg) {
+  let el = document.getElementById('toast');
+  if (!el) { el = document.createElement('div'); el.id = 'toast'; document.body.appendChild(el); }
+  el.textContent = msg;
+  el.classList.add('on');
+  clearTimeout(el.__t);
+  el.__t = setTimeout(() => el.classList.remove('on'), 1800);
+}
+
+function showPage(id) {
+  $$('.page').forEach(p => p.classList.remove('on'));
+  const el = document.getElementById('pg-' + id);
+  if (el) el.classList.add('on');
+}
+
+/* ================= 存储（按角色分命名空间，绝不混用） ================= */
+const Store = {
+  key(k) { return 'de_' + (ROLE || 'demo') + '_' + k; },
+  get(k, dft) {
+    try { const v = localStorage.getItem(this.key(k)); return v == null ? dft : JSON.parse(v); }
+    catch (e) { return dft; }
+  },
+  set(k, v) {
+    try { localStorage.setItem(this.key(k), JSON.stringify(v)); } catch (e) { }
+  },
+  del(k) { try { localStorage.removeItem(this.key(k)); } catch (e) { } }
+};
+
+/* ================= 同步层（只走内网中转，不依赖任何第三方云） =================
+   协议：
+     收 GET  {base}/events?channel=<频道>  → SSE，帧 data: {"sender":"uX","data":"<消息JSON>"}
+     发 POST {base}/send  {channel,data,sender}
+   connect()  订阅本班频道（主连接）
+   subscribe() 订阅任意频道（学生报到页听「大厅」，需要第二条独立连接）
+   无中转服务器时自动降级为「单机模式」：教师端看不到学生，学生端照常闯关。        */
+const Sync = {
+  base: '', es: null, online: false,
+  myId: 'u' + Math.random().toString(16).slice(2, 10),
+  channel: '', onMsg: null, onOpen: null, _seen: {},
+
+  resolveBase() {
+    // 1) URL 参数 ?relay=IP:PORT   2) localStorage   3) 同源（用服务器打开时的零配置路径）
+    let q = '';
+    try { q = new URLSearchParams(location.search).get('relay') || ''; } catch (e) { }
+    let saved = '';
+    try { saved = localStorage.getItem(CONFIG.RELAY_KEY) || ''; } catch (e) { }
+    let same = '';
+    if (location.protocol === 'http:' || location.protocol === 'https:') same = location.host;
+    const h = (q || saved || same || '').replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    this.base = h ? ((h.indexOf('://') >= 0 ? '' : 'http://') + h) : '';
+    return this.base;
+  },
+
+  _parse(ev, onMsg) {
+    let d;
+    try { d = JSON.parse(ev.data); } catch (e) { return; }
+    if (!d || d.sender === this.myId) return;
+    let m;
+    try { m = JSON.parse(d.data); } catch (e) { return; }
+    // 2 秒内同消息去重：多通道 / 重连时同一条会重复触发
+    const sig = JSON.stringify(m), now = Date.now();
+    if (this._seen[sig] && now - this._seen[sig] < 2000) return;
+    this._seen[sig] = now;
+    if (m && m.t && onMsg) onMsg(m);
+  },
+
+  connect(code, onMsg) {
+    this.channel = 'de_v1_' + String(code);
+    this.onMsg = onMsg;
+    this.disconnect();
+    if (!this.resolveBase()) { this.online = false; paintNet(); return; }
+    const self = this;
+    try {
+      this.es = new EventSource(this.base + '/events?channel=' + encodeURIComponent(this.channel));
+      this.es.onopen = () => { self.online = true; paintNet(); if (self.onOpen) self.onOpen(); };
+      this.es.onerror = () => { self.online = false; paintNet(); };
+      this.es.onmessage = ev => self._parse(ev, onMsg);
+    } catch (e) { this.online = false; paintNet(); }
+  },
+
+  /* 独立订阅一条频道，返回 {close()}。不占用主连接，也不改 online 状态。 */
+  subscribe(ch, onMsg) {
+    if (!this.base) this.resolveBase();
+    if (!this.base) return { close() { } };
+    const self = this;
+    let es = null;
+    try {
+      es = new EventSource(this.base + '/events?channel=' + encodeURIComponent(ch));
+      es.onmessage = ev => self._parse(ev, onMsg);
+    } catch (e) { return { close() { } }; }
+    return { close() { try { es.close(); } catch (e) { } } };
+  },
+
+  disconnect() {
+    if (this.es) { try { this.es.close(); } catch (e) { } this.es = null; }
+    this.online = false;
+  },
+
+  /* 第二个参数是目标频道：教师端往「大厅」播配置时用，不必另开连接 */
+  send(obj, ch) {
+    if (!this.base || !this.online) return false;
+    const body = JSON.stringify({
+      channel: ch || this.channel, sender: this.myId, data: JSON.stringify(obj)
+    });
+    try {
+      fetch(this.base + '/send', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body
+      }).catch(() => { });
+    } catch (e) { return false; }
+    return true;
+  }
+};
+
+/* 学生机地址：老师机为开摄像头常用 127.0.0.1 打开，location.host 是回环，
+   直接显示会误导全班。从 /netinfo 拿服务端挑好的内网地址。 */
+const Net = {
+  studentUrl: '', ok: false,
+  isLoop(host) { return !host || /^(127\.|localhost|\[::1\]|::1$)/i.test(host); },
+  load() {
+    const host = location.host || '';
+    if (!this.isLoop(host)) { this.studentUrl = 'http://' + host + '/s'; this.ok = true; this.apply(); }
+    try {
+      fetch('netinfo', { cache: 'no-store' })
+        .then(r => r.json())
+        .then(d => {
+          if (!d || !d.ok) return;
+          if (this.isLoop(host) && d.studentUrl) this.studentUrl = d.studentUrl;
+          this.ok = !!this.studentUrl;
+          this.apply();
+        })
+        .catch(() => { });
+    } catch (e) { }
+  },
+  apply() { if (typeof T !== 'undefined') { T.paintStuUrl(); T.paintQR(); } }
+};
+
+function paintNet() {
+  const on = !!Sync.online;
+  const tx = ROLE === 'T' ? $('#t-net-tx') : $('#s-net-tx');
+  if (tx) tx.textContent = on ? '已连接' : '离线';
+  /* 圆点和文字是两个元素，两个都要换 —— 只改圆点的 class 会让文字永远停在「离线」 */
+  ['#t-net', '#s-net'].forEach(sel => {
+    const d = $(sel);
+    if (d) d.className = 'dot' + (on ? ' on' : '');
+  });
+  const wrap = $('#t-net-wrap');
+  if (wrap) wrap.title = on ? ('已连接 ' + (Sync.base || '')) : '没连上课堂服务器';
+}
+
+/* ================= 教师端 ================= */
+/* #if T */
+const T = {
+  code: '', cfg: null, open: [1], sec: 0, run: false, _tlv: 0,
+  stu: {}, guests: {}, gscore: {}, wallAll: false, cvView: 'run', _qrUrl: '',
+
+  init() {
+    this.code = Store.get('code', '') || rnd4();
+    Store.set('code', this.code);
+
+    /* 旧存档迁移：判断必须落在 saved 自己身上。
+       不能先合并再判断 —— DEFAULTS.cfg.mins 恒有 5 个元素，永远「看起来有值」；
+       也不能对全新安装走这段，否则默认的 [10,12,15,12,8] 会被统一成 12 分钟。 */
+    const sc = Store.get('cfg', {}) || {};
+    const hasSaved = Object.keys(sc).length > 0;
+    this.cfg = Object.assign({}, DEFAULTS.cfg, sc);
+    if (hasSaved && (!Array.isArray(sc.mins) || sc.mins.length < CONFIG.LEVELS.length)) {
+      const m = clamp(Math.round(+(sc.minutes || 12)) || 12, 1, 90);
+      this.cfg.mins = CONFIG.LEVELS.map(() => m);
+    }
+    this.cfg.mins = CONFIG.LEVELS.map((L, i) =>
+      clamp(Math.round(+this.cfg.mins[i]) || DEFAULTS.cfg.mins[i], 1, 90));
+    this.cfg.groups = clamp(Math.round(+this.cfg.groups || 8), CONFIG.GROUP_MIN, CONFIG.GROUP_MAX);
+
+    this.open = (Store.get('open', [1]) || [1]).filter(x => x >= 1 && x <= CONFIG.LEVELS.length);
+    if (!this.open.length) this.open = [1];
+    this.open.sort((a, b) => a - b);
+
+    this._tlv = this.curLv();
+    this.sec = this.lvSec(this._tlv);
+
+    this.bind();
+    this.paintSetting();
+    this.paintTimerBtn();
+    this.renderLvCtrl();
+    this.renderWall(this.list());
+    this.tick();
+    this.render();
+
+    Sync.connect(this.code, m => this.onMsg(m));
+    Sync.onOpen = () => this.hb();
+
+    setInterval(() => this.tick(), 1000);
+    setInterval(() => this.hb(), CONFIG.HB_MS);
+    setInterval(() => this.cleanup(), 5000);
+    Net.load();
+    this.hb();
+  },
+
+  bind() {
+    $$('#t-tabs button').forEach(b => b.onclick = () => {
+      const tab = b.dataset.tab;
+      $$('#t-tabs button').forEach(x => x.classList.toggle('on', x === b));
+      $$('.tab').forEach(t => t.classList.toggle('on', t.id === 'tab-' + tab));
+      /* 全屏看板盖住整个视口，切页签时先收掉，不然它会挂在新页上 */
+      if (this.wallAll) this.wallAllOff();
+    });
+
+    $('#btnWallAll').onclick = () => this.wallAllOn();
+    $('#woClose').onclick = () => this.wallAllOff();
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && this.wallAll) this.wallAllOff();
+    });
+
+    $$('#cvSeg button').forEach(b => b.onclick = () => this.cv(b.dataset.cv));
+
+    $('#t-open').onclick = () => this.openNext();
+    $('#t-timer').onclick = () => {
+      this.run = !this.run; this.paintTimerBtn(); this.hb();
+    };
+    $('#t-add5').onclick = () => { this.sec += 300; this.tick(); this.hb(); };
+    $('#t-zero').onclick = () => { this.sec = this.lvSec(this.curLv()); this.run = false; this.paintTimerBtn(); this.tick(); this.hb(); };
+    $('#t-reset').onclick = () => this.reset();
+    $('#t-csv').onclick = () => this.csv();
+
+    $('#t-newcode').onclick = () => {
+      this.code = rnd4();
+      Store.set('code', this.code);
+      $('#t-code').textContent = this.code;
+      Sync.connect(this.code, m => this.onMsg(m));
+      toast('课堂码已换成 ' + this.code + '，学生要重新报到');
+      this.hb();
+    };
+
+    $('#stCourse').onchange = () => {
+      this.cfg.title = ($('#stCourse').value || '').trim().slice(0, 24);
+      this.persist(); this.paintCourse(); this.hb();
+    };
+
+    $$('#stGroups .gp').forEach(b => b.onclick = () => this.setGroups(+b.dataset.g));
+    $('#stGrpN').onchange = () => {
+      const v = clamp(Math.round(+$('#stGrpN').value || 8), CONFIG.GROUP_MIN, CONFIG.GROUP_MAX);
+      $('#stGrpN').value = v;
+      this.setGroups(v);
+    };
+
+    $('#stMins').onchange = e => {
+      const inp = e.target.closest('input[data-lv]');
+      if (!inp) return;
+      this.setMin(+inp.dataset.lv, inp.value);
+    };
+
+    $('#stJump').onchange = () => { this.cfg.jump = $('#stJump').checked; this.persist(); this.hb(); };
+    $('#stReal').onchange = () => { this.cfg.real = $('#stReal').checked; this.persist(); this.render(); this.hb(); };
+  },
+
+  persist() {
+    Store.set('cfg', this.cfg);
+    Store.set('open', this.open);
+  },
+
+  /* ---------- 计时：跟着「当前关」走 ---------- */
+  /* 当前关 = 已放行里最大的那一关（学生此刻在做的那关）。
+     全部关闭时退回第 1 关，别让计时器变成一个没有归属的数字。 */
+  curLv() {
+    const o = (this.open || []).slice().sort((a, b) => a - b);
+    return o.length ? o[o.length - 1] : 1;
+  },
+  lvMin(lv) {
+    const v = Math.round(+((this.cfg.mins || [])[lv - 1]));
+    return (v >= 1 && v <= 90) ? v : 12;
+  },
+  lvSec(lv) { return this.lvMin(lv) * 60; },
+
+  /* 放行/收回关卡后调。只有真的换了关才重置倒计时——
+     否则「顺手开一下第 2 关」也会把正在跑的计时清零。 */
+  syncTimerLv() {
+    const lv = this.curLv();
+    if (this._tlv === lv) return;
+    this._tlv = lv;
+    this.sec = this.lvSec(lv);
+    this.run = false;
+    this.paintTimerBtn();
+    this.tick();
+    this.renderMins();
+    toast('进入第 ' + lv + ' 关 · ' + this.lvMin(lv) + ' 分钟');
+  },
+
+  tick() {
+    if (this.run && this.sec > 0) this.sec--;
+    if (this.sec <= 0 && this.run) { this.run = false; this.paintTimerBtn(); }
+    const ct = $('#ctRound');
+    if (ct) ct.textContent = '第 ' + this.curLv() + ' 关 · ' + fmt(this.sec);
+    const op = $('#ctOpen');
+    if (op) op.textContent = '已开放 ' + this.open.length + ' / ' + CONFIG.LEVELS.length + ' 关';
+  },
+
+  paintTimerBtn() {
+    const b = $('#t-timer');
+    if (b) b.textContent = this.run ? '⏸ 暂停计时' : '▶ 开始计时';
+  },
+
+  /* ---------- 心跳：一条给本班，一条给大厅 ---------- */
+  hb() {
+    Sync.send({ t: 'hb', open: this.open, sec: this.sec, run: this.run, cfg: this.cfg,
+                rank: this.rankTop(10) });
+    /* 大厅那份只带配置和放行：报到页还没有课堂码，连不到本班频道，
+       而组按钮正是报到页要用的东西。不带排行榜，别让几十个学生每 3 秒收一遍大块数据。 */
+    Sync.send({ t: 'cfg', cfg: this.cfg, open: this.open, code: this.code }, CONFIG.LOBBY);
+  },
+
+  /* ---------- 放行 ---------- */
+  openNext() {
+    const max = CONFIG.LEVELS.length;
+    let top = (this.open.length ? Math.max.apply(null, this.open) : 1) + 1;
+    top = clamp(top, 1, max);
+    if (this.open.indexOf(top) < 0) this.open.push(top);
+    this.open.sort((a, b) => a - b);
+    this.afterOpen();
+  },
+  toggleLv(id) {
+    const i = this.open.indexOf(id);
+    if (i >= 0) this.open.splice(i, 1); else this.open.push(id);
+    this.open.sort((a, b) => a - b);
+    this.afterOpen();
+  },
+  afterOpen() {
+    this.persist();
+    this.syncTimerLv();
+    this.renderLvCtrl();
+    this.renderWall(this.list());
+    this.tick();
+    this.hb();
+  },
+
+  renderLvCtrl() {
+    const box = $('#lvCtrl');
+    if (!box) return;
+    const html = CONFIG.LEVELS.map(L =>
+      '<div class="lv-row' + (this.open.indexOf(L.id) >= 0 ? ' on' : '') + '" data-lv="' + L.id + '">' +
+        '<span class="no">0' + L.id + '</span>' +
+        '<span class="nm">' + esc(L.name) + '<em>' + esc(L.sub) + ' · ' + this.lvMin(L.id) + ' 分钟</em></span>' +
+        '<span class="sw"></span></div>').join('');
+    if (setHTML(box, html)) {
+      $$('#lvCtrl .lv-row').forEach(el => el.onclick = () => this.toggleLv(+el.dataset.lv));
+    }
+  },
+
+  /* ---------- 学生消息 ---------- */
+  onMsg(m) {
+    /* 听课老师不算组别、不进名单、不计成绩；只记最后活跃，大屏上多一句提示 */
+    if (m.guest || m.t === 'guest') {
+      this.guests[m.id || 'g'] = Date.now();
+      this.render();
+      return;
+    }
+    if (m.t === 'ping') {
+      const s = this.stu[m.id];
+      if (!s) return;
+      const was = this.online(s);
+      s.seen = Date.now();
+      if (!was) this.render();      // 只有「离线 → 在线」才重绘，别让 40 人每 8 秒刷一遍
+      return;
+    }
+    if (m.t === 'join' || m.t === 'prog' || m.t === 'help') {
+      const s = this.stu[m.id] || (this.stu[m.id] = { score: 0, seen: 0 });
+      if (m.name) s.name = m.name;
+      s.name = s.name || '匿名';
+      s.g = clamp(m.g || s.g || 1, 1, this.cfg.groups);
+      s.lv = m.lv || s.lv || 1;
+      s.done = (m.done == null ? (s.done || 0) : m.done);
+      s.help = !!m.help;
+      s.seen = Date.now();
+      this.render();
+      if (m.t === 'join') this.hb();     // 新生进来立刻把当前状态推给他
+      return;
+    }
+    if (m.t === 'bye') { delete this.stu[m.id]; this.render(); }
+  },
+
+  cleanup() {
+    const now = Date.now();
+    let dirty = false;
+    Object.keys(this.stu).forEach(id => {
+      if (now - (this.stu[id].seen || 0) > CONFIG.OFFLINE_MS * 4) { delete this.stu[id]; dirty = true; }
+    });
+    Object.keys(this.guests).forEach(k => {
+      if (now - this.guests[k] > CONFIG.OFFLINE_MS * 4) { delete this.guests[k]; dirty = true; }
+    });
+    if (dirty) this.render();
+  },
+
+  online(s) { return Date.now() - (s.seen || 0) < CONFIG.OFFLINE_MS; },
+  list() {
+    const arr = Object.keys(this.stu).map(id => Object.assign({ id: id }, this.stu[id]));
+    arr.sort((a, b) => (a.g - b.g) || String(a.name).localeCompare(String(b.name), 'zh'));
+    return arr;
+  },
+  mask(n) {
+    const s = String(n || '匿名');
+    return s.length <= 1 ? s : s.charAt(0) + new Array(s.length).join('*');
+  },
+  rankTop(n) {
+    const arr = this.list().filter(s => this.online(s));
+    arr.sort((a, b) => ((b.done || 0) - (a.done || 0)) || ((b.score || 0) - (a.score || 0)));
+    return arr.slice(0, n).map(s => ({
+      i: s.id, n: this.cfg.real ? s.name : this.mask(s.name), g: s.g, d: s.done || 0, s: s.score || 0
+    }));
+  },
+
+  /* ---------- 渲染 ---------- */
+  render() {
+    const arr = this.list();
+    const L = CONFIG.LEVELS.length;
+    const online = arr.filter(s => this.online(s));
+    const doneN = online.filter(s => (s.done || 0) >= L).length;
+    const avg = online.length ? online.reduce((a, s) => a + (s.done || 0), 0) / online.length : 0;
+
+    const elOn = $('#t-online'), elDone = $('#t-done'), elAvg = $('#t-avg');
+    if (elOn) elOn.textContent = online.length;
+    if (elDone) elDone.textContent = doneN;
+    if (elAvg) elAvg.textContent = avg.toFixed(1);
+
+    this.renderWall(arr);
+    this.renderRank();
+    this.renderHelp(arr, online);
+    this.renderGroups(arr);
+    this.renderData(arr, L);
+    if (this.wallAll) this.renderWallAll(arr, online);
+  },
+
+  renderWall(arr) {
+    const box = $('#wall');
+    if (!box) return;
+    const L = CONFIG.LEVELS.length, g = this.cfg.groups;
+    box.classList.toggle('dense', g > 9);
+    let h = '<div class="wrow wh"><span class="wg">小组</span>';
+    for (let l = 1; l <= L; l++) h += '<span class="whd">第' + l + '关</span>';
+    h += '<span class="wtot">全通</span></div>';
+    for (let gi = 1; gi <= g; gi++) {
+      const mem = arr.filter(s => s.g === gi);
+      h += '<div class="wrow"><span class="wg">' + gi + '组</span>';
+      for (let l = 1; l <= L; l++) {
+        const n = mem.filter(s => (s.done || 0) >= l).length;
+        const pct = mem.length ? Math.round(n / mem.length * 100) : 0;
+        h += '<span class="wcell' + (n ? ' has' : '') + '"><i style="height:' + pct + '%"></i><b>' + n + '</b></span>';
+      }
+      const full = mem.filter(s => (s.done || 0) >= L).length;
+      h += '<span class="wtot">' + full + '/' + mem.length + '</span></div>';
+    }
+    setHTML(box, h);
+  },
+
+  renderRank() {
+    const box = $('#t-rank');
+    if (!box) return;
+    const arr = this.rankTop(8);
+    if (!arr.length) { setHTML(box, '<li><span class="nm ph-sub">还没有人在线</span></li>'); return; }
+    setHTML(box, arr.map((s, i) =>
+      '<li><span class="rk">' + (i + 1) + '</span><span class="nm">' + esc(s.n) +
+      '<em style="font-style:normal;color:var(--muted);font-size:12px"> · ' + s.g + '组</em></span>' +
+      '<span class="dg">' + s.d + ' 关</span></li>').join(''));
+  },
+
+  renderHelp(arr, online) {
+    const box = $('#t-help');
+    if (!box) return;
+    const hs = arr.filter(s => s.help && this.online(s));
+    if (!hs.length) { setHTML(box, '<div class="ph-sub">没人举手</div>'); return; }
+    setHTML(box, hs.map(s =>
+      '<div class="hp"><span class="help-dot"></span>' + esc(s.name) + ' · ' + s.g + '组 · 第 ' + (s.lv || 1) + ' 关</div>').join(''));
+  },
+
+  renderGroups(arr) {
+    const box = $('#t-groups');
+    if (!box) return;
+    let h = '';
+    for (let g = 1; g <= this.cfg.groups; g++) {
+      const mem = arr.filter(s => s.g === g);
+      const sc = mem.reduce((a, s) => a + (s.score || 0), 0) + (this.gscore[g] || 0);
+      h += '<div class="gcard"><div class="gt"><span>第 ' + g + ' 组</span>' +
+        '<small>' + mem.length + ' 人</small></div>' +
+        '<div class="gsc">' + sc + '</div>' +
+        '<div class="gm">' + (mem.length ? mem.map(s => esc(s.name)).join(' · ') : '—') + '</div>' +
+        '<div class="ops"><button data-act="1" data-g="' + g + '">+1</button>' +
+        '<button class="minus" data-act="-1" data-g="' + g + '">−1</button></div></div>';
+    }
+    if (setHTML(box, h)) {
+      $$('#t-groups .ops button').forEach(b => b.onclick = () => this.addScore(+b.dataset.g, +b.dataset.act));
+    }
+  },
+
+  renderData(arr, L) {
+    const body = $('#t-data-body');
+    if (!body) return;
+    const bars = $('#t-lvbars');
+    if (bars) {
+      const on = arr.filter(s => this.online(s));
+      setHTML(bars, CONFIG.LEVELS.map(lv => {
+        const n = on.filter(s => (s.done || 0) >= lv.id).length;
+        const pct = on.length ? Math.round(n / on.length * 100) : 0;
+        return '<div class="lv-bar"><span>第' + lv.id + '关</span><span class="tr"><i style="width:' + pct + '%"></i></span><span>' + n + ' 人</span></div>';
+      }).join(''));
+    }
+    setHTML(body, arr.map(s =>
+      '<tr><td>' + esc(s.name) + '</td><td>' + s.g + '</td><td>' + (s.done || 0) + '/' + L + '</td>' +
+      '<td>' + (s.score || 0) + '</td><td>' + (this.online(s) ? '在线' : '离线') + '</td>' +
+      '<td>' + new Date(s.seen || Date.now()).toLocaleTimeString('zh-CN') + '</td></tr>').join(''));
+    const em = $('#t-data-empty');
+    if (em) em.hidden = arr.length > 0;
+  },
+
+  /* ---------- 全屏看板 ---------- */
+  wallAllOn() {
+    this.wallAll = true;
+    $('#wallOv').hidden = false;
+    this.renderWallAll(this.list(), this.list().filter(s => this.online(s)));
+  },
+  wallAllOff() {
+    this.wallAll = false;
+    const ov = $('#wallOv');
+    if (ov) ov.hidden = true;
+  },
+  renderWallAll(arr, online) {
+    const L = CONFIG.LEVELS.length;
+    setHTML($('#woOnline'), String(online.length));
+    setHTML($('#woDone'), String(online.filter(s => (s.done || 0) >= L).length));
+    const avg = online.length ? online.reduce((a, s) => a + (s.done || 0), 0) / online.length : 0;
+    setHTML($('#woAvg'), avg.toFixed(1));
+
+    let h = '';
+    for (let gi = 1; gi <= this.cfg.groups; gi++) {
+      const mem = arr.filter(s => s.g === gi);
+      const full = mem.filter(s => (s.done || 0) >= L).length;
+      h += '<div class="wo-g"><h5>第 ' + gi + ' 组<span>' + mem.length + ' 人' +
+        (full ? ' · ' + full + ' 人全通关' : '') + '</span></h5><div class="wo-stus">';
+      if (!mem.length) h += '<div class="wo-empty">还没有人</div>';
+      mem.forEach(s => {
+        const d = s.done || 0, off = !this.online(s);
+        let bars = '';
+        for (let l = 1; l <= L; l++) bars += '<i class="' + (d >= l ? 'on' : '') + '"></i>';
+        h += '<div class="wc' + (d >= L ? ' full' : '') + (off ? ' off' : '') + '">' +
+          '<div class="nm">' + esc(s.name) + '</div>' +
+          '<div class="bar">' + bars + '</div>' +
+          '<div class="mt">已过 ' + d + '/' + L + ' · ' + (d >= L ? '全部通关' : '当前第 ' + Math.min(L, d + 1) + ' 关') + '</div></div>';
+      });
+      h += '</div></div>';
+    }
+    setHTML($('#woBody'), h);
+  },
+
+  /* ---------- 课前设置 ---------- */
+  cv(view) {
+    if (view) this.cvView = (view === 'cfg' ? 'cfg' : 'run');
+    const v = this.cvView;
+    const run = $('#cvRun'), cfg = $('#cvCfg');
+    if (run) run.hidden = (v !== 'run');
+    if (cfg) cfg.hidden = (v !== 'cfg');
+    $$('#cvSeg button').forEach(b => b.classList.toggle('on', b.dataset.cv === v));
+    if (v === 'cfg') {
+      this.paintSetting();
+      /* 隐藏状态下量不出尺寸（clientWidth 全是 0），必须等真的显示了再算 */
+      this.paintStuUrl();
+      this.paintQR();
+    } else {
+      this.renderLvCtrl();
+      this.renderGroups(this.list());
+    }
+  },
+
+  paintSetting() {
+    const c = $('#t-code');
+    if (c) c.textContent = this.code;
+
+    const t = $('#stCourse');
+    if (t && document.activeElement !== t) t.value = this.cfg.title || '';
+
+    const n = $('#stGrpN');
+    if (n && document.activeElement !== n) n.value = this.cfg.groups;
+    $$('#stGroups .gp').forEach(b => b.classList.toggle('on', +b.dataset.g === this.cfg.groups));
+
+    this.renderMins();
+
+    const j = $('#stJump'), r = $('#stReal');
+    if (j) j.checked = !!this.cfg.jump;
+    if (r) r.checked = !!this.cfg.real;
+  },
+
+  /* 五关时长：一格一关。结构只建一次，之后只同步 value ——
+     每次改动都重写 innerHTML 会把老师正在输入的焦点弄丢。 */
+  renderMins() {
+    const box = $('#stMins');
+    if (!box) return;
+    if (box.children.length !== CONFIG.LEVELS.length) {
+      box.innerHTML = CONFIG.LEVELS.map(lv =>
+        '<div class="min-cell"><em>第' + lv.id + '关</em>' +
+        '<input type="number" min="1" max="90" step="1" inputmode="numeric" data-lv="' + lv.id + '"' +
+        ' aria-label="第' + lv.id + '关时长（分钟）"></div>').join('');
+    }
+    const cur = this.curLv();
+    $$('#stMins .min-cell').forEach((cell, i) => {
+      const lv = i + 1;
+      const inp = cell.querySelector('input');
+      if (document.activeElement !== inp) inp.value = this.lvMin(lv);
+      cell.classList.toggle('now', lv === cur);
+    });
+  },
+
+  setMin(lv, v) {
+    const m = clamp(Math.round(+v) || 12, 1, 90);
+    this.cfg.mins[lv - 1] = m;
+    this.persist();
+    if (lv === this.curLv() && !this.run) { this.sec = m * 60; this.tick(); }
+    this.renderMins();
+    this.renderLvCtrl();
+    this.hb();
+  },
+
+  setGroups(v) {
+    const g = clamp(Math.round(+v || 0), CONFIG.GROUP_MIN, CONFIG.GROUP_MAX);
+    if (!g || g === this.cfg.groups) { this.paintSetting(); return; }
+    this.cfg.groups = g;
+    this.persist();
+    this.paintSetting();
+    this.renderWall(this.list());
+    this.renderGroups(this.list());
+    this.paintQR();          // 二维码里带着组数，改了要重画
+    this.render();           // 学情页的组别也变了
+    this.hb();               // 大厅会转给学生，报到页的组按钮跟着变
+    toast('分组已改为 ' + g + ' 组');
+  },
+
+  /* 课程名的落点：大屏副标题 + 控制台副标题（学生端在收心跳时写状态条） */
+  paintCourse() {
+    const t = this.cfg.title || CONFIG.APP;
+    ['#bdTitle'].forEach(sel => { const el = $(sel); if (el) el.textContent = t; });
+  },
+
+  /* 课堂码下面那行学生端地址：只认真实地址，拿不到就明说「待确认」，绝不显示 127.0.0.1 */
+  paintStuUrl() {
+    const u = $('#stuUrl');
+    if (!u) return;
+    if (Net.ok && Net.studentUrl) {
+      u.classList.remove('warn');
+      u.innerHTML = '<span id="stuUrlTx">' + esc(Net.studentUrl) + '</span>' +
+        '<small>学生机浏览器输入这个地址</small>';
+    } else {
+      u.classList.add('warn');
+      u.innerHTML = '<span id="stuUrlTx">教师机地址待确认</span>' +
+        '<small>看服务器窗口里那一行地址</small>';
+    }
+    this.fitStuUrl();
+  },
+
+  /* 地址长度是变数：192.168.3.87:8099/s 是 26 字符，192.168.100.100 就 30 个。
+     一级一级缩字号，总之不许折行——折了学生要照着两行抄。 */
+  fitStuUrl() {
+    const el = $('#stuUrlTx');
+    if (!el) return;
+    el.style.fontSize = '';
+    if (!el.clientWidth) return;      // 隐藏时量不出来，切到课前设置会重算
+    let fs = Math.round(parseFloat(getComputedStyle(el).fontSize) || 18);
+    while (fs > 12 && el.scrollWidth > el.clientWidth + 1) {
+      fs -= 1;
+      el.style.fontSize = fs + 'px';
+    }
+  },
+
+  /* 学生端二维码：qr.js 自己算，不走外网。
+     码里带 ?g=<组数>：扫码进来第一眼就是对的组按钮，不用等大厅那一轮心跳。
+     拿不到地址就不画假码 —— 一个扫不出东西的方块比没有更耽误事。 */
+  paintQR() {
+    const box = $('#qrBox'), cv = $('#qrCv'), tip = $('#qrTip');
+    if (!cv) return;
+    const url = (Net.ok && Net.studentUrl) ? Net.studentUrl : '';
+    if (!url || typeof QRCode === 'undefined') {
+      if (box) box.classList.add('none');
+      if (tip) tip.textContent = url ? '二维码组件没加载' : '还没有地址，扫码暂不可用';
+      this._qrUrl = '';
+      return;
+    }
+    if (box) box.classList.remove('none');
+    const grp = clamp(Math.round(this.cfg.groups || 8), CONFIG.GROUP_MIN, CONFIG.GROUP_MAX);
+    const target = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'g=' + grp;
+    if (this._qrUrl === target) return;      // 地址/组数都没变就别反复重画
+    try {
+      const r = QRCode.encode(target, 'M');
+      const n = r.size, q = 4, total = n + q * 2;
+      /* 每模块取整数像素：非整数会让边缘糊成灰，手机更难对焦 */
+      const px = Math.max(4, Math.floor(660 / total));
+      cv.width = cv.height = total * px;
+      const g = cv.getContext('2d');
+      g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
+      g.fillStyle = '#0b1220';
+      for (let y = 0; y < n; y++) {
+        for (let x = 0; x < n; x++) {
+          if (r.modules[y][x]) g.fillRect((x + q) * px, (y + q) * px, px, px);
+        }
+      }
+      this._qrUrl = target;
+      if (tip) tip.textContent = '扫码直接进学生端，或输 4 位码';
+    } catch (e) {
+      if (box) box.classList.add('none');
+      if (tip) tip.textContent = '二维码生成失败，输地址进';
+      console.warn('[qr]', e);
+    }
+  },
+
+  /* ---------- 加分 / 清空 / 导出 ---------- */
+  addScore(g, d) {
+    let n = 0;
+    Object.keys(this.stu).forEach(id => {
+      const s = this.stu[id];
+      if (s.g === g) { s.score = (s.score || 0) + d; n++; }
+    });
+    if (!n) this.gscore[g] = (this.gscore[g] || 0) + d;   // 没人在线也记在组上，别白点
+    Sync.send({ t: 'score', g: g, d: d });
+    this.render();
+  },
+
+  reset() {
+    this.stu = {}; this.guests = {}; this.gscore = {};
+    this.open = [1];
+    this._tlv = 1;
+    this.sec = this.lvSec(1);
+    this.run = false;
+    this.persist();
+    this.paintTimerBtn();
+    this.renderLvCtrl();
+    this.tick();
+    this.render();
+    this.hb();
+    toast('课堂数据已清空（课堂码和设置保留）');
+  },
+
+  csv() {
+    const arr = this.list();
+    if (!arr.length) { $('#t-csv-msg').textContent = '还没有数据'; return; }
+    const head = '姓名,小组,已过关,得分,最后活跃\n';
+    const body = arr.map(s => [s.name, s.g, (s.done || 0), (s.score || 0),
+      new Date(s.seen || Date.now()).toLocaleString('zh-CN')].join(',')).join('\n');
+    const blob = new Blob(['\ufeff' + head + body], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '课堂数据_' + this.code + '.csv';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+    $('#t-csv-msg').textContent = '已导出 ' + arr.length + ' 条';
+  }
+};
+/* #endif */
+
+/* ================= 学生端 ================= */
+/* #if S */
+/* 大厅：报到页还没有课堂码，连不到本班频道，但组按钮要用老师的真实组数。
+   所以另开一条连接听大厅频道，报到成功后关掉（之后靠本班心跳继续同步）。 */
+const Lobby = {
+  h: null,
+  start() {
+    if (this.h) return;
+    this.h = Sync.subscribe(CONFIG.LOBBY, m => {
+      if (m.t !== 'cfg' || !m.cfg) return;
+      S.applyGroups(m.cfg.groups);
+      if (m.cfg.title) S.paintCourse(m.cfg.title);
+    });
+  },
+  stop() { if (this.h) { this.h.close(); this.h = null; } }
+};
+
+const S = {
+  id: 's' + Math.random().toString(16).slice(2, 8),
+  name: '', g: 1, groups: 8, code: '', lv: 1, done: 0,
+  open: [1], sec: 0, run: false, cfg: {}, picked: {}, joined: false,
+
+  init() {
+    /* 扫码进来会带 ?g=<组数>：先按它画，再等大厅把老师的真实组数推过来 */
+    const q = Math.round(+(new URLSearchParams(location.search).get('g') || 0));
+    this.paintGroups(q >= CONFIG.GROUP_MIN && q <= CONFIG.GROUP_MAX ? q : 8);
+
+    $('#j-go').onclick = () => this.enter();
+    $('#j-code').onkeydown = e => { if (e.key === 'Enter') $('#j-name').focus(); };
+    $('#j-name').onkeydown = e => { if (e.key === 'Enter') this.enter(); };
+    $('#cert-close').onclick = () => $('#s-cert').classList.remove('on');
+    $('#cert-save').onclick = () => this.saveCert();
+    $('#s-cert-nav').onclick = () => {
+      const left = CONFIG.LEVELS.length - this.done;
+      if (left > 0) { toast('还有 ' + left + ' 关没通过，全部通关才能领证书'); return; }
+      this.showCert();
+    };
+
+    const last = Store.get('last', null);
+    if (last && last.name) {
+      $('#j-name').value = last.name;
+      $('#j-code').value = last.code || '';
+      if (last.g) { this.g = last.g; this.paintGroups(this.groups); }
+    }
+    Lobby.start();
+  },
+
+  /* 组按钮数量是变数：老师改成 10 组，已经开着的报到页也要立刻变 10 个 */
+  paintGroups(n) {
+    const g = clamp(Math.round(+n || 8), CONFIG.GROUP_MIN, CONFIG.GROUP_MAX);
+    this.groups = g;
+    if (this.g > g) this.g = g;
+    const box = $('#j-groups');
+    if (!box) return;
+    let h = '';
+    for (let i = 1; i <= g; i++) h += '<button class="grp" data-g="' + i + '">' + i + '</button>';
+    if (setHTML(box, h)) {
+      $$('#j-groups .grp').forEach(b => b.onclick = () => {
+        this.g = +b.dataset.g;
+        $$('#j-groups .grp').forEach(x => x.classList.toggle('on', x === b));
+      });
+    }
+    $$('#j-groups .grp').forEach(x => x.classList.toggle('on', +x.dataset.g === this.g));
+    const gs = $('#s-grp');
+    if (gs) gs.textContent = '第 ' + this.g + ' 组';
+  },
+
+  /* 老师改组数后调。必须先存 was：paintGroups 里已经把 this.g 夹过一次，
+     之后再比 this.g > g 永远为假，夹到末组的学生就不会重报，老师名单里挂着一个空组。 */
+  applyGroups(n) {
+    const g = Math.round(+n || 0);
+    if (!(g >= CONFIG.GROUP_MIN && g <= CONFIG.GROUP_MAX) || g === this.groups) return;
+    const was = this.g;
+    this.paintGroups(g);
+    if (this.joined && was > g) this.report({ t: 'join' });
+  },
+
+  enter() {
+    const code = ($('#j-code').value || '').trim();
+    const name = ($('#j-name').value || '').trim();
+    if (!/^\d{4}$/.test(code)) { $('#j-msg').textContent = '课堂码是 4 位数字'; return; }
+    if (!name) { $('#j-msg').textContent = '请填写姓名'; return; }
+
+    this.code = code; this.name = name; this.joined = true;
+    Lobby.stop();                       // 进课堂后靠本班心跳，不再多占一条连接
+    Store.set('last', { name: name, g: this.g, code: code });
+
+    showPage('student');
+    $('#s-who').innerHTML = esc(name) + '<small id="s-grp">第 ' + this.g + ' 组</small>';
+    this.paintCourse(this.cfg.title);
+
+    Sync.connect(code, m => this.onMsg(m));
+    Sync.onOpen = () => this.report({ t: 'join' });
+    this.report({ t: 'join' });
+
+    this.renderMap();
+    this.openTask(this.lv);
+    this.paintCertNav();
+    setInterval(() => this.tick(), 1000);
+    /* 每 8 秒报一次活着的信号：只在切页/交卷上报的话，安静一会儿全班都「离线」 */
+    setInterval(() => this.report({ t: 'ping' }), CONFIG.PING_MS);
+
+    // 无中转服务器时降级为「自习模式」：全关开放，只是老师看不到
+    setTimeout(() => {
+      if (!Sync.online) { this.open = CONFIG.LEVELS.map(L => L.id); this.renderMap(); }
+    }, 2500);
+  },
+
+  onMsg(m) {
+    if (m.t === 'hb') {
+      if (m.cfg) {
+        this.cfg = m.cfg;
+        this.paintCourse(this.cfg.title);
+        this.applyGroups(this.cfg.groups);
+      }
+      this.open = (m.open && m.open.length) ? m.open : [1];
+      this.sec = (m.sec == null ? this.sec : m.sec);
+      this.run = !!m.run;
+      const top = Math.max.apply(null, this.open);
+      if (this.lv > top) this.lv = top;
+      this.renderMap();
+      this.tick();
+    } else if (m.t === 'cfg' && m.cfg) {
+      this.cfg = m.cfg;
+      this.applyGroups(this.cfg.groups);
+      this.paintCourse(this.cfg.title);
+    }
+  },
+
+  report(extra) {
+    Sync.send(Object.assign({
+      t: 'prog', id: this.id, name: this.name, g: this.g,
+      lv: this.lv, done: this.done, help: false
+    }, extra || {}));
+  },
+
+  tick() {
+    const el = $('#s-timer');
+    if (el) { el.textContent = fmt(this.sec); el.className = 'timer' + (this.sec <= 60 ? ' warn' : ''); }
+    const r = $('#s-round');
+    if (r) r.textContent = '第 ' + this.lv + ' 关';
+  },
+
+  paintCourse(t) {
+    const el = $('#s-course');
+    if (el) el.textContent = t || CONFIG.APP;
+  },
+
+  unlocked(lv) {
+    if (this.open.indexOf(lv) >= 0) return true;
+    if (this.done >= lv - 1) return true;
+    if (this.cfg && this.cfg.jump) return lv <= Math.max.apply(null, this.open);
+    return false;
+  },
+
+  renderMap() {
+    const box = $('#s-map');
+    if (!box) return;
+    setHTML(box, CONFIG.LEVELS.map(L => {
+      const done = this.done >= L.id;
+      const cur = this.lv === L.id;
+      const lock = !this.unlocked(L.id);
+      const cls = 'chip' + (done ? ' done' : (cur ? ' cur' : (lock ? ' lock' : '')));
+      return '<button class="' + cls + '" data-lv="' + L.id + '">' +
+        '<span class="no">' + (done ? '✓' : L.id) + '</span>' + L.name +
+        '<span style="font-size:13px;opacity:.7">' + L.sub + '</span></button>';
+    }).join(''));
+    $$('#s-map .chip').forEach(b => b.onclick = () => {
+      const lv = +b.dataset.lv;
+      if (!this.unlocked(lv)) { toast('第 ' + lv + ' 关还没放行，等老师'); return; }
+      this.lv = lv; this.renderMap(); this.openTask(lv); this.tick();
+    });
+  },
+
+  /* 关卡内容：换课程只改这一个函数 + CONFIG.LEVELS */
+  content(lv) {
+    const bank = {
+      1: { title: '热身：先看一遍规则', qs: [
+        { q: '课堂上抢答前应该先做什么？', a: ['举手', '直接喊'], k: 0 },
+        { q: '本课共几关？', a: ['三关', '五关'], k: 1 }
+      ] },
+      2: { title: '练习：动手做一次', qs: [
+        { q: '完成后要不要看结果？', a: ['要看', '不用看'], k: 0 },
+        { q: '结果不对时应该？', a: ['改到对', '跳过'], k: 0 }
+      ] },
+      3: { title: '挑战：换一个场景', qs: [
+        { q: '换个场景还能用同样的方法吗？', a: ['能，方法可迁移', '不能'], k: 0 },
+        { q: '为什么？', a: ['因为步骤一样', '因为运气'], k: 0 }
+      ] },
+      4: { title: '综合：把两步连起来', qs: [
+        { q: '先做什么？', a: ['先看清楚问题', '先写答案'], k: 0 },
+        { q: '做完怎么确认？', a: ['对照要求检查', '交了就完'], k: 0 }
+      ] },
+      5: { title: '出师：说说你的结论', qs: [
+        { q: '这节课最关键的收获是？', a: ['方法本身', '背下答案'], k: 0 },
+        { q: '下次遇到新问题？', a: ['照方法再做一次', '等老师'], k: 0 }
+      ] }
+    };
+    return bank[lv] || bank[1];
+  },
+
+  openTask(lv) {
+    const data = this.content(lv);
+    this.picked = {};
+    const box = $('#s-task');
+    box.innerHTML = '<h3>第 ' + lv + ' 关 · ' + esc(data.title) + '</h3>' +
+      '<div class="sub">全部答对即可过关</div>' +
+      data.qs.map((q, i) =>
+        '<div class="q" data-i="' + i + '"><div class="qq">' + (i + 1) + '. ' + esc(q.q) + '</div>' +
+        '<div class="opts">' + q.a.map((a, j) =>
+          '<button class="opt" data-i="' + i + '" data-j="' + j + '">' + esc(a) + '</button>').join('') +
+        '</div></div>').join('') +
+      '<div class="foot-row"><button class="btn" id="s-submit">提交</button>' +
+      '<span class="msg" id="s-msg"></span></div>';
+
+    $$('#s-task .opt').forEach(b => b.onclick = () => {
+      const i = +b.dataset.i;
+      b.parentNode.querySelectorAll('.opt').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      this.picked[i] = +b.dataset.j;
+    });
+    $('#s-submit').onclick = () => this.submit(lv, data);
+  },
+
+  submit(lv, data) {
+    const need = data.qs.length;
+    if (Object.keys(this.picked).length < need) { $('#s-msg').textContent = '还有题没选'; return; }
+    let ok = 0;
+    data.qs.forEach((q, i) => {
+      const right = this.picked[i] === q.k;
+      if (right) ok++;
+      $$('#s-task .q[data-i="' + i + '"] .opt').forEach((b, j) => {
+        b.classList.remove('on');
+        if (j === q.k) b.classList.add('right');
+        else if (this.picked[i] === j) b.classList.add('wrong');
+      });
+    });
+    if (ok < need) { $('#s-msg').textContent = '答对 ' + ok + '/' + need + '，再想想'; return; }
+    $('#s-msg').textContent = '过关！';
+    if (this.done < lv) this.done = lv;
+    this.report();
+    this.renderMap();
+    this.paintCertNav();
+    const nxt = Math.min(CONFIG.LEVELS.length, lv + 1);
+    if (this.done >= CONFIG.LEVELS.length) { this.showCert(); return; }
+    setTimeout(() => {
+      if (this.unlocked(nxt)) { this.lv = nxt; this.renderMap(); this.openTask(nxt); this.tick(); }
+      else { $('#s-msg').textContent = '已提交，等老师放行下一关'; }
+    }, 700);
+  },
+
+  /* 证书门闩：这里只管按钮的「灰不灰」，点击入口另有一道拦截（见 init），两道都在 */
+  paintCertNav() {
+    const b = $('#s-cert-nav');
+    if (!b) return;
+    const all = this.done >= CONFIG.LEVELS.length;
+    b.classList.toggle('locked', !all);
+    b.title = all ? '查看结业证书' : ('还有 ' + (CONFIG.LEVELS.length - this.done) + ' 关没通过');
+  },
+
+  showCert() {
+    $('#cert-name').textContent = this.name;
+    $('#cert-body').textContent = '已完成《' + (this.cfg.title || CONFIG.APP) + '》全部 ' +
+      CONFIG.LEVELS.length + ' 关，特发此证。';
+    $('#s-cert').classList.add('on');
+  },
+
+  saveCert() {
+    const W = 900, H = 620, c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const x = c.getContext('2d');
+    x.fillStyle = '#fffdf7'; x.fillRect(0, 0, W, H);
+    x.strokeStyle = '#16794f'; x.lineWidth = 6; x.strokeRect(22, 22, W - 44, H - 44);
+    x.lineWidth = 1; x.strokeRect(34, 34, W - 68, H - 68);
+    x.fillStyle = '#0f5c3b'; x.textAlign = 'center';
+    x.font = 'bold 40px "Microsoft YaHei",sans-serif';
+    x.fillText('结 业 证 书', W / 2, 140);
+    x.fillStyle = '#66796e'; x.font = '20px "Microsoft YaHei",sans-serif';
+    x.fillText('兹证明', W / 2, 200);
+    x.fillStyle = '#17281f'; x.font = 'bold 48px "Microsoft YaHei",sans-serif';
+    x.fillText(this.name, W / 2, 286);
+    x.fillStyle = '#66796e'; x.font = '20px "Microsoft YaHei",sans-serif';
+    x.fillText('已完成《' + (this.cfg.title || CONFIG.APP) + '》全部 ' + CONFIG.LEVELS.length + ' 关', W / 2, 348);
+    x.fillText('特发此证', W / 2, 384);
+    x.fillStyle = '#98a8a0'; x.font = '16px "Microsoft YaHei",sans-serif';
+    x.fillText(new Date().toLocaleDateString('zh-CN'), W / 2, 500);
+    const a = document.createElement('a');
+    a.href = c.toDataURL('image/png');
+    a.download = '证书_' + this.name + '.png';
+    a.click();
+  }
+};
+/* #endif */
+
+/* ================= 启动 ================= */
+(function boot() {
+  // 构建产出的角色文件：直达本角色页面，另一端的代码在构建时已被裁掉
+/* #if T */
+  if (ROLE === 'T') { showPage('teacher'); T.init(); return; }
+/* #endif */
+/* #if S */
+  if (ROLE === 'S') { showPage('join'); S.init(); return; }
+/* #endif */
+/* #if DEMO */
+  showPage('role');
+  if ($('#rc-teacher')) $('#rc-teacher').onclick = () => { window.__ROLE__ = 'T'; T.init(); showPage('teacher'); };
+  if ($('#rc-student')) $('#rc-student').onclick = () => { window.__ROLE__ = 'S'; S.init(); showPage('join'); };
+/* #endif */
+})();
+</script>
+</body>
+</html>
