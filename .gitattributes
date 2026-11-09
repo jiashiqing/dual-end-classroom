@@ -1,5 +1,11 @@
+# 文本统一 LF 入库
 * text=auto eol=lf
-*.bat text eol=crlf
+
+# .bat 不做任何转换：仓库里就是 CRLF 字节。
+# 理由：老师常常是从 GitHub「Raw」直接下单个 bat 去救场，
+# raw 不走 checkout 的 eol 转换；若按 text 入库，raw 出来是 LF，
+# cmd.exe 对 LF-only 批处理的 goto/label 解析有坑。
+*.bat -text
 
 # 图片按二进制处理，避免行尾转换损坏素材
 *.png binary
