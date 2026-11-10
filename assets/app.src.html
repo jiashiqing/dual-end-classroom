@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- v3 · 2026-11-10 · 学情 AI 分析（12 家厂商 · 默认 DeepSeek · 流式）/ v2 的课前设置（课堂码+二维码）· 自定义组数 · 每关独立时长 · 进度墙+全屏看板 · 证书门闩 -->
+<!-- v3.1 · 2026-11-10 · 小组积分（冲线 10/7/5 + 整组过关每关 +2 + 教师分，大屏实时榜）/ v3 的学情 AI 分析（12 家厂商 · 默认 DeepSeek · 流式）/ v2 的课前设置（课堂码+二维码）· 自定义组数 · 每关独立时长 · 进度墙+全屏看板 · 证书门闩 -->
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>双端课堂 · __ROLE_LABEL__ · v3</title>
+<title>双端课堂 · __ROLE_LABEL__ · v3.1</title>
 <style>
 /* 骨架样式：1366×768 起步，正文 ≥16px，主按钮 ≥18px */
 :root{
@@ -165,7 +165,7 @@ button{font:inherit;cursor:pointer}
 .wall.dense .wrow{gap:4px}
 .wall.dense .wcell b{font-size:16px}
 .wall.dense .wg{font-size:12px}
-.kpi-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;flex:0 0 auto;margin-top:10px}
+.kpi-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;flex:0 0 auto;margin-top:10px}
 .kpi{display:flex;align-items:baseline;gap:8px;padding:8px 14px;background:#f7fbf8;border:1px solid var(--line);border-radius:12px;min-width:0}
 .kpi em{font-style:normal;color:var(--muted);font-size:14px;white-space:nowrap}
 .kpi b{font-size:30px;line-height:1.2;color:var(--main-2);font-variant-numeric:tabular-nums}
@@ -178,6 +178,30 @@ button{font:inherit;cursor:pointer}
 #t-rank .rk{flex:0 0 18px;color:var(--muted);font-variant-numeric:tabular-nums}
 #t-rank .nm{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
 #t-rank .dg{flex:0 0 auto;color:var(--ok);font-weight:700}
+
+/* ---------- 小组积分（右栏积分榜 + 进度墙积分列） ---------- */
+/* 标题行右侧的小切换：小组 / 个人。h4 本身是灰底小字，按钮得把字距和字号收回来 */
+.h4seg{display:flex;align-items:center;gap:8px}
+.seg2{display:inline-flex;gap:2px;margin-left:auto;padding:2px;border-radius:8px;
+  background:#eef4f0;border:1px solid var(--line);letter-spacing:0}
+.seg2 button{padding:2px 9px;border:0;border-radius:6px;background:none;cursor:pointer;
+  font:inherit;font-size:12px;letter-spacing:0;color:var(--muted)}
+.seg2 button.on{background:#fff;color:var(--main-2);font-weight:700;
+  box-shadow:0 1px 3px rgba(0,0,0,.08)}
+/* 组名列加宽到 76：冲线之后要挂一个「冲」字徽标。
+   必须是 flex —— 原来 .wg 是 grid，文本和 <i> 徽标会各占一行（「1组」上面、「冲」掉到下面） */
+.wg{flex:0 0 76px;display:flex;align-items:center;justify-content:center;gap:4px}
+.wfin{flex:0 0 auto}
+.wpts{flex:0 0 46px;display:grid;place-items:center;font-size:13px;font-weight:700;
+  color:var(--main-2);font-variant-numeric:tabular-nums}
+.wrow.wh .wpts{color:var(--muted);font-weight:400}
+.wall.dense .wpts{font-size:11px}
+.wall.dense .wfin{font-size:10px}
+.wfin{display:inline-block;margin-left:4px;font-style:normal;font-size:11px;font-weight:700;
+  color:#8a6d00;background:#fff5cc;border:1px solid #f0d77a;border-radius:5px;
+  padding:0 3px;line-height:1.4;vertical-align:middle}
+#t-rank .nm em{font-style:normal;color:var(--muted);font-size:12px}
+#t-rank li.r1 .rk,#t-rank li.r1 .dg{color:#c99a00}
 .hc{flex:0 0 auto}
 #t-help .hp{display:flex;align-items:center;gap:8px;font-size:14px;padding:3px 0}
 .help-dot{width:8px;height:8px;border-radius:50%;background:#e11d48;display:inline-block;flex:0 0 auto}
@@ -436,10 +460,13 @@ table.roster tr:hover td{background:#fbfdfb}
             <div class="kpi"><em>在线</em><b id="t-online">0</b><i>人</i></div>
             <div class="kpi"><em>已通关</em><b id="t-done">0</b><i>人</i></div>
             <div class="kpi"><em>平均关数</em><b id="t-avg">0.0</b></div>
+            <div class="kpi"><em>当前领先</em><b id="t-lead" style="font-size:20px">—</b></div>
           </div>
         </div>
         <div class="bcol">
-          <div class="card rc"><h4>实时排行榜</h4><ol id="t-rank"></ol></div>
+          <div class="card rc"><h4 class="h4seg"><span id="t-rank-title">小组积分榜</span>
+            <span class="seg2" id="t-rank-seg"><button type="button" data-rk="g" class="on">小组</button><button type="button" data-rk="s">个人</button></span>
+          </h4><ol id="t-rank"></ol></div>
           <div class="card hc"><h4>举手求助</h4><div id="t-help"></div></div>
         </div>
       </div>
@@ -452,6 +479,7 @@ table.roster tr:hover td{background:#fbfdfb}
           <h3>学情</h3>
           <span class="ph-sub">全部来自学生端上报，下课导走，别指望下次打开还在</span>
           <button class="btn sm" id="t-csv">导出 CSV</button>
+          <button class="btn sm" id="t-csvg">导出小组积分</button>
           <button class="btn sm" id="btnAI">🤖 AI 分析</button>
           <span class="msg ph-sub" id="t-csv-msg"></span>
         </div>
@@ -868,9 +896,23 @@ const AI_SYS = [
   '不要复述我的要求，不要用「作为一名教师」这类套话；总字数 400–600 字；用中文。'
 ].join('\n');
 
+/* ================= 小组积分规则（唯一口径） =================
+   改分只改这一处；文字说明见 references/03-课堂管控组件.md 的「学情 AI」同级小节。
+   总分 = 冲线分 + 覆盖分 + 教师分
+     · 冲线分：小组全员通过全部关卡的名次 → 10 / 7 / 5，第 4 个起保底 3
+     · 覆盖分：前 N-1 关里，组内所有人都过了这一关 → 每关 +2
+     · 教师分：老师点 +/− 手动加，不设上限（建议单节 ≤10） */
+const SRULE = { fin: [10, 7, 5], floor: 3, cover: 2 };
+/* 覆盖分只算到「倒数第二关」：最后一关全员通过就是冲线，不重复给分 */
+function SRULE_CV() { return Math.max(0, CONFIG.LEVELS.length - 1); }
+
 const T = {
   code: '', cfg: null, open: [1], sec: 0, run: false, _tlv: 0,
-  stu: {}, guests: {}, gscore: {}, wallAll: false, cvView: 'run', _qrUrl: '',
+  stu: {}, guests: {}, wallAll: false, cvView: 'run', _qrUrl: '',
+  /* 小组积分：{ 组号: {auto, manual} }；冲线顺序 fin=[组号…]、已发过的覆盖分 lv={'3-2':1} */
+  gpts: {}, award: { fin: [], lv: {} },
+  /* 右栏看哪张榜：'g' 小组积分（默认）/ 's' 个人 */
+  rankView: 'g',
 
   init() {
     this.code = Store.get('code', '') || rnd4();
@@ -945,6 +987,8 @@ const T = {
     $('#t-zero').onclick = () => { this.sec = this.lvSec(this.curLv()); this.run = false; this.paintTimerBtn(); this.tick(); this.hb(); };
     $('#t-reset').onclick = () => this.reset();
     $('#t-csv').onclick = () => this.csv();
+    $('#t-csvg').onclick = () => this.csvGroup();
+    $$('#t-rank-seg button').forEach(b => b.onclick = () => this.setRankView(b.dataset.rk));
 
     $('#t-newcode').onclick = () => {
       this.code = rnd4();
@@ -1094,6 +1138,9 @@ const T = {
       s.done = (m.done == null ? (s.done || 0) : m.done);
       s.help = !!m.help;
       s.seen = Date.now();
+      /* 先判定积分（可能刚有人过关 / 全组冲线），再重绘 —— 反了会闪「分已上榜、进度还是旧的」。
+         学生退出（bye）不判定：否则「最慢的那个人走了」会让剩下的组白捡一个冲线。 */
+      this.judgeAwards();
       this.render();
       if (m.t === 'join') this.hb();     // 新生进来立刻把当前状态推给他
       return;
@@ -1143,6 +1190,12 @@ const T = {
     if (elOn) elOn.textContent = online.length;
     if (elDone) elDone.textContent = doneN;
     if (elAvg) elAvg.textContent = avg.toFixed(1);
+    /* 当前领先：一分没开时显示破折号，别在开课第一秒就造一个假冠军 */
+    const elLead = $('#t-lead');
+    if (elLead) {
+      const top0 = this.gRank()[0];
+      elLead.textContent = top0 && top0.pts > 0 ? '第' + top0.g + '组' : '—';
+    }
 
     this.renderWall(arr);
     this.renderRank();
@@ -1157,19 +1210,23 @@ const T = {
     if (!box) return;
     const L = CONFIG.LEVELS.length, g = this.cfg.groups;
     box.classList.toggle('dense', g > 9);
+    const top = this.gRank()[0];
+    const lead = top && top.pts > 0 ? top.g : 0;
     let h = '<div class="wrow wh"><span class="wg">小组</span>';
     for (let l = 1; l <= L; l++) h += '<span class="whd">第' + l + '关</span>';
-    h += '<span class="wtot">全通</span></div>';
+    h += '<span class="wtot">全通</span><span class="wpts">积分</span></div>';
     for (let gi = 1; gi <= g; gi++) {
       const mem = arr.filter(s => s.g === gi);
-      h += '<div class="wrow"><span class="wg">' + gi + '组</span>';
+      h += '<div class="wrow"><span class="wg">' + gi + '组' +
+        (this.award.fin.indexOf(gi) >= 0 ? '<i class="wfin">冲</i>' : '') + '</span>';
       for (let l = 1; l <= L; l++) {
         const n = mem.filter(s => (s.done || 0) >= l).length;
         const pct = mem.length ? Math.round(n / mem.length * 100) : 0;
         h += '<span class="wcell' + (n ? ' has' : '') + '"><i style="height:' + pct + '%"></i><b>' + n + '</b></span>';
       }
       const full = mem.filter(s => (s.done || 0) >= L).length;
-      h += '<span class="wtot">' + full + '/' + mem.length + '</span></div>';
+      h += '<span class="wtot">' + full + '/' + mem.length + '</span>' +
+        '<span class="wpts">' + (mem.length ? this.gTotal(gi) : '—') + '</span></div>';
     }
     setHTML(box, h);
   },
@@ -1177,12 +1234,88 @@ const T = {
   renderRank() {
     const box = $('#t-rank');
     if (!box) return;
+    const tip = $('#t-rank-title');
+    /* 小组榜：面向「最后评哪个组最好」，默认停在这张 */
+    if (this.rankView !== 's') {
+      if (tip) tip.textContent = '小组积分榜';
+      const rows = this.gRank();
+      if (!rows.length) { setHTML(box, '<li><span class="nm ph-sub">还没有人报到</span></li>'); return; }
+      const lead = rows[0].pts > 0 ? rows[0].g : 0;
+      setHTML(box, rows.slice(0, 8).map((r, i) =>
+        '<li class="' + (i === 0 ? 'r1' : '') + '"><span class="rk">' + (i + 1) + '</span>' +
+        '<span class="nm">' + (r.g === lead ? '🏆 ' : '') + '第' + r.g + '组' +
+        '<em> · ' + r.n + '人' + (r.fin >= 0 ? ' · 冲线' + (r.fin + 1) : '') + '</em></span>' +
+        '<span class="dg">' + r.pts + ' 分</span></li>').join(''));
+      return;
+    }
+    if (tip) tip.textContent = '实时排行榜';
     const arr = this.rankTop(8);
     if (!arr.length) { setHTML(box, '<li><span class="nm ph-sub">还没有人在线</span></li>'); return; }
     setHTML(box, arr.map((s, i) =>
       '<li><span class="rk">' + (i + 1) + '</span><span class="nm">' + esc(s.n) +
-      '<em style="font-style:normal;color:var(--muted);font-size:12px"> · ' + s.g + '组</em></span>' +
+      '<em> · ' + s.g + '组</em></span>' +
       '<span class="dg">' + s.d + ' 关</span></li>').join(''));
+  },
+
+  /* ---------- 小组积分：判定 / 汇总 / 排名 ---------- */
+  pts(g) {
+    const k = +g;
+    return this.gpts[k] || (this.gpts[k] = { auto: 0, manual: 0 });
+  },
+  gTotal(g) { const p = this.gpts[+g]; return p ? (p.auto || 0) + (p.manual || 0) : 0; },
+  /* 组内「全员」= 这一组当前有记录的所有人（含离线）；空组不参与判定 */
+  gDone(g, lv) {
+    const mem = this.list().filter(s => s.g === g);
+    return !!mem.length && mem.every(s => (s.done || 0) >= lv);
+  },
+  /* 幂等判定：调用点只有 onMsg 的 join/prog/help，刷新重连都不会重复发分 */
+  judgeAwards() {
+    const covMax = Math.min(SRULE_CV(), CONFIG.LEVELS.length - 1);
+    for (let g = 1; g <= this.cfg.groups; g++) {
+      if (!this.list().some(s => s.g === g)) continue;
+      for (let lv = 1; lv <= covMax; lv++) {
+        if (this.award.lv[g + '-' + lv]) continue;
+        if (!this.gDone(g, lv)) continue;
+        this.award.lv[g + '-' + lv] = 1;
+        this.addAuto(g, SRULE.cover, '第' + lv + '关整组通过', true);
+      }
+      if (this.award.fin.indexOf(g) >= 0) continue;
+      if (!this.gDone(g, CONFIG.LEVELS.length)) continue;
+      this.award.fin.push(g);
+      const i = this.award.fin.length - 1;
+      this.addAuto(g, i < SRULE.fin.length ? SRULE.fin[i] : SRULE.floor,
+        i < SRULE.fin.length ? '全员通关·第' + (i + 1) + '个' : '全员通关');
+    }
+  },
+  addAuto(g, d, why, quiet) {
+    this.pts(g).auto += d;
+    Sync.send({ t: 'score', g: g, d: d, why: why });   // 学生端弹「你们组 +N 分」
+    /* 覆盖分不弹大屏 toast：8 组 × 4 关最多 32 次，每次都盖住底部 KPI 两秒，反而吵。
+       分数在墙上、榜上都会变，学生端也各自收到提示；只有「冲线」值得打断全班。 */
+    if (!quiet) toast('第 ' + g + ' 组 ' + why + ' +' + d + ' 分');
+  },
+  /* 总分 → 冲线先后 → 平均关数 → 组号（同分永远排得出确定名次） */
+  gRank() {
+    const arr = this.list();
+    const rows = [];
+    for (let g = 1; g <= this.cfg.groups; g++) {
+      const mem = arr.filter(s => s.g === g);
+      if (!mem.length) continue;
+      const p = this.gpts[g] || { auto: 0, manual: 0 };
+      const sum = mem.reduce((a, s) => a + (s.done || 0), 0);
+      rows.push({ g: g, n: mem.length, pts: (p.auto || 0) + (p.manual || 0),
+        auto: p.auto || 0, manual: p.manual || 0,
+        fin: this.award.fin.indexOf(g), avg: sum / mem.length });
+    }
+    rows.sort((a, b) => b.pts - a.pts
+      || (a.fin < 0 ? 99 : a.fin) - (b.fin < 0 ? 99 : b.fin)
+      || b.avg - a.avg || a.g - b.g);
+    return rows;
+  },
+  setRankView(v) {
+    this.rankView = (v === 's' ? 's' : 'g');
+    $$('#t-rank-seg button').forEach(b => b.classList.toggle('on', b.dataset.rk === this.rankView));
+    this.renderRank();
   },
 
   renderHelp(arr, online) {
@@ -1198,12 +1331,18 @@ const T = {
     const box = $('#t-groups');
     if (!box) return;
     let h = '';
+    /* 领先组只算一次（放在循环外）：8~12 组时每张卡都重排一遍榜单不值当 */
+    const lead = this.gRank()[0];
     for (let g = 1; g <= this.cfg.groups; g++) {
       const mem = arr.filter(s => s.g === g);
-      const sc = mem.reduce((a, s) => a + (s.score || 0), 0) + (this.gscore[g] || 0);
-      h += '<div class="gcard"><div class="gt"><span>第 ' + g + ' 组</span>' +
+      const p = this.gpts[g] || { auto: 0, manual: 0 };
+      const finAt = this.award.fin.indexOf(g);
+      const crown = lead && lead.g === g && (p.auto + p.manual) > 0 ? ' 🏆' : '';
+      h += '<div class="gcard"><div class="gt"><span>第 ' + g + ' 组' + crown + '</span>' +
         '<small>' + mem.length + ' 人</small></div>' +
-        '<div class="gsc">' + sc + '</div>' +
+        '<div class="gsc">' + ((p.auto || 0) + (p.manual || 0)) + '</div>' +
+        '<div class="ph-sub" style="font-size:11px;margin:-2px 0 4px">自动 ' + (p.auto || 0) +
+        ' · 教师 ' + (p.manual || 0) + (finAt >= 0 ? ' · 冲线' + (finAt + 1) : '') + '</div>' +
         '<div class="gm">' + (mem.length ? mem.map(s => esc(s.name)).join(' · ') : '—') + '</div>' +
         '<div class="ops"><button data-act="1" data-g="' + g + '">+1</button>' +
         '<button class="minus" data-act="-1" data-g="' + g + '">−1</button></div></div>';
@@ -1333,10 +1472,14 @@ const T = {
       const mem = arr.filter(s => s.g === g);
       if (!mem.length) { out.push('  第' + g + '组：无人报到'); continue; }
       const d = mem.reduce((a, s) => a + (s.done || 0), 0) / mem.length;
-      const sc = mem.reduce((a, s) => a + (s.score || 0), 0) + (this.gscore[g] || 0);
+      /* 组积分走 gpts（auto + manual），别再读 v2 的 gscore —— 那个字段已经不存在了 */
+      const gp = this.gpts[g] || { auto: 0, manual: 0 };
+      const finAt = this.award.fin.indexOf(g);
       out.push('  第' + g + '组：' + mem.length + ' 人，平均已过 ' + d.toFixed(1)
-               + ' 关，组内积分 ' + sc + '，全通关 '
-               + mem.filter(s => (s.done || 0) >= L.length).length + ' 人');
+               + ' 关，小组积分 ' + this.gTotal(g)
+               + '（自动 ' + (gp.auto || 0) + ' + 教师 ' + (gp.manual || 0) + '）'
+               + (finAt >= 0 ? '，全员通关第 ' + (finAt + 1) + ' 个' : '，尚未全员通关')
+               + '，全通关 ' + mem.filter(s => (s.done || 0) >= L.length).length + ' 人');
     }
     out.push('【学生明细】姓名｜组｜已过关｜积分｜当前关｜状态');
     arr.forEach(s => {
@@ -1366,6 +1509,12 @@ const T = {
 
     s.key = key; s.model = model; s.base = base; this.aiSave();
 
+    /* 先把数据整理成文本：aiData 万一抛异常（改字段最容易踩），
+       在这里 catch 能在面板上看到原因，而不是「分析中」一直转到超时 */
+    let data;
+    try { data = this.aiData(s.note); }
+    catch (e) { this.aiFail('整理课堂数据出错：' + (e && e.message ? e.message : e)); return; }
+
     this._aiBusy = true; this._aiText = ''; this._aiErr = '';
     const run = $('#aiRun');
     run.disabled = true; run.textContent = '分析中…';
@@ -1384,7 +1533,7 @@ const T = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode: p.mode, base: base, model: model, key: key,
-                             system: AI_SYS, prompt: this.aiData(s.note), stream: true })
+                             system: AI_SYS, prompt: data, stream: true })
     }).then(res => {
       const ct = res.headers.get('Content-Type') || '';
       if (ct.indexOf('event-stream') < 0) {
@@ -1518,7 +1667,7 @@ const T = {
       const mem = arr.filter(s => s.g === gi);
       const full = mem.filter(s => (s.done || 0) >= L).length;
       h += '<div class="wo-g"><h5>第 ' + gi + ' 组<span>' + mem.length + ' 人' +
-        (full ? ' · ' + full + ' 人全通关' : '') + '</span></h5><div class="wo-stus">';
+        (full ? ' · ' + full + ' 人全通关' : '') + ' · ' + this.gTotal(gi) + ' 分</span></h5><div class="wo-stus">';
       if (!mem.length) h += '<div class="wo-empty">还没有人</div>';
       mem.forEach(s => {
         const d = s.done || 0, off = !this.online(s);
@@ -1692,19 +1841,20 @@ const T = {
   },
 
   /* ---------- 加分 / 清空 / 导出 ---------- */
+  /* 教师分：一次点击＝这一组 ±1，不按人数乘（老写法是每人 +1 再求和，6 人组点一下等于 6） */
   addScore(g, d) {
-    let n = 0;
+    this.pts(g).manual += d;
     Object.keys(this.stu).forEach(id => {
       const s = this.stu[id];
-      if (s.g === g) { s.score = (s.score || 0) + d; n++; }
+      if (s.g === g) s.score = (s.score || 0) + d;   // 个人榜照旧每人记一笔，学生看得见
     });
-    if (!n) this.gscore[g] = (this.gscore[g] || 0) + d;   // 没人在线也记在组上，别白点
     Sync.send({ t: 'score', g: g, d: d });
     this.render();
   },
 
   reset() {
-    this.stu = {}; this.guests = {}; this.gscore = {};
+    this.stu = {}; this.guests = {};
+    this.gpts = {}; this.award = { fin: [], lv: {} };   // 积分与冲线记录一并归零
     this.open = [1];
     this._tlv = 1;
     this.sec = this.lvSec(1);
@@ -1731,6 +1881,26 @@ const T = {
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 3000);
     $('#t-csv-msg').textContent = '已导出 ' + arr.length + ' 条';
+  },
+
+  /* 小组积分表：名单那张是过程数据，这张是评优结论（名次、总分、分从哪来）。
+     文件末尾附一行规则摘要，脱离这份文档也能看懂。 */
+  csvGroup() {
+    const rows = this.gRank();
+    if (!rows.length) { $('#t-csv-msg').textContent = '还没有可统计的小组'; return; }
+    const head = '名次,小组,人数,总积分,自动分,教师分,冲线名次,平均已过关,全员通关\n';
+    const body = rows.map((r, i) => [i + 1, '第' + r.g + '组', r.n, r.pts, r.auto, r.manual,
+      r.fin >= 0 ? (r.fin + 1) : '—', r.avg.toFixed(1), r.fin >= 0 ? '是' : '否'].join(',')).join('\n');
+    const rule = '\n\n规则：全员通关 +' + SRULE.fin.join('/') + '（第' + (SRULE.fin.length + 1) +
+      ' 个起 +' + SRULE.floor + '）；前 ' + Math.min(SRULE_CV(), CONFIG.LEVELS.length - 1) +
+      ' 关整组通过每关 +' + SRULE.cover + '；教师分手动加。';
+    const blob = new Blob(['\ufeff' + head + body + rule], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = '小组积分_' + this.code + '.csv';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+    $('#t-csv-msg').textContent = '已导出 ' + rows.length + ' 个小组';
   }
 };
 /* #endif */
