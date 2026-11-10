@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- v2 · 2026-11-09 · 课前设置（课堂码+二维码）/ 自定义组数 / 每关独立时长 / 进度墙+全屏看板 / 证书门闩 -->
+<!-- v3 · 2026-11-10 · 学情 AI 分析（12 家厂商 · 默认 DeepSeek · 流式）/ v2 的课前设置（课堂码+二维码）· 自定义组数 · 每关独立时长 · 进度墙+全屏看板 · 证书门闩 -->
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>双端课堂 · __ROLE_LABEL__ · v2</title>
+<title>双端课堂 · __ROLE_LABEL__ · v3</title>
 <style>
 /* 骨架样式：1366×768 起步，正文 ≥16px，主按钮 ≥18px */
 :root{
@@ -291,6 +291,57 @@ table.roster tr:hover td{background:#fbfdfb}
 .cert-box .tx{color:var(--muted);font-size:14px;line-height:2}
 /* 证书按钮：没通关时压暗但不隐藏——学生得知道有这张证可领 */
 .btn.locked{opacity:.4;cursor:not-allowed}
+
+/* ---------- 学情 · AI 分析（全屏，同看板一样盖住视口） ---------- */
+.ai-ov{position:fixed;inset:0;z-index:85;background:var(--bg);
+  display:flex;flex-direction:column;padding:14px 20px 16px}
+.ai-head{display:flex;align-items:center;gap:12px;flex:0 0 auto}
+.ai-title{margin:0;font-size:20px;font-weight:700}
+.ai-title em{font-style:normal;color:var(--main)}
+.ai-head .btn{margin-left:auto;flex:0 0 auto}
+.ai-bar{display:flex;align-items:center;gap:10px;margin-top:12px;flex:0 0 auto;
+  min-width:0;flex-wrap:nowrap}
+.ai-bar.sub{margin-top:8px}
+.ai-inp{height:40px;min-width:0;padding:0 11px;font:inherit;color:var(--ink);
+  border:1px solid var(--line);border-radius:9px;background:#fbfdfb;outline:none}
+.ai-inp:focus{border-color:var(--main);box-shadow:0 0 0 3px rgba(22,121,79,.12)}
+#aiProv{width:190px;flex:0 0 auto;padding-right:6px}
+#aiModel{width:200px;flex:0 0 auto}
+#aiKey{flex:1 1 auto}
+#aiBase{width:320px;flex:0 0 auto}
+#aiNote{flex:1 1 auto}
+.ai-run{flex:0 0 auto;height:40px;padding:0 18px;border:0;border-radius:9px;
+  background:var(--main);color:#fff;font-weight:700;font-size:16px}
+.ai-run:hover{background:var(--main-2)}
+.ai-run:disabled{opacity:.6;cursor:progress}
+.ai-state{flex:0 0 auto;min-width:96px;text-align:right;color:var(--muted);font-size:14px;
+  white-space:nowrap;font-variant-numeric:tabular-nums}
+.ai-body{flex:1 1 auto;min-height:0;overflow-y:auto;margin-top:12px;padding:18px 22px;
+  background:var(--panel);border:1px solid var(--line);border-radius:16px;
+  font-size:16px;line-height:1.8}
+.ai-body h4{margin:16px 0 6px;font-size:17px;color:var(--main-2)}
+.ai-body h4:first-child{margin-top:0}
+.ai-body p{margin:0 0 10px}
+.ai-body ul{margin:0 0 10px;padding-left:22px}
+.ai-body li{margin:4px 0}
+.ai-body b{color:var(--main-2)}
+.ai-empty{color:var(--muted);line-height:2}
+.ai-empty b{color:var(--main-2)}
+.ai-err{margin-top:12px;padding:10px 14px;border-radius:10px;
+  background:#fdecec;border:1px solid #f3c2c2;color:var(--warn);font-size:14px}
+.ai-caret{display:inline-block;width:8px;height:16px;vertical-align:-2px;
+  background:var(--main);animation:aiblink .9s steps(1) infinite}
+@keyframes aiblink{50%{opacity:0}}
+.ai-foot{flex:0 0 auto;display:flex;align-items:center;gap:10px;margin-top:8px;
+  color:var(--muted);font-size:12px}
+.ai-foot span{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 1366×768 下把控制行压薄一点，别让结果区只剩一条缝 */
+@media (max-height:800px){
+  .ai-ov{padding:10px 16px 12px}
+  .ai-bar{margin-top:8px}
+  .ai-inp,.ai-run{height:36px}
+  .ai-body{margin-top:8px;padding:14px 18px}
+}
 </style>
 </head>
 <body>
@@ -401,6 +452,7 @@ table.roster tr:hover td{background:#fbfdfb}
           <h3>学情</h3>
           <span class="ph-sub">全部来自学生端上报，下课导走，别指望下次打开还在</span>
           <button class="btn sm" id="t-csv">导出 CSV</button>
+          <button class="btn sm" id="btnAI">🤖 AI 分析</button>
           <span class="msg ph-sub" id="t-csv-msg"></span>
         </div>
         <div class="ph-sub">每关通过人数</div>
@@ -508,6 +560,35 @@ table.roster tr:hover td{background:#fbfdfb}
     <button class="btn ghost sm" id="woClose">✕ 关闭（Esc）</button>
   </div>
   <div class="wo-body" id="woBody"></div>
+</div>
+
+<!-- ---- 学情 · AI 分析：把这一节课的数据交给大模型出一份课后分析 ----
+     做成整屏而不是塞进学情卡片：400~600 字的分析在 1366×768 的卡片里放不下，
+     而且投屏讲评时后排也要跟着看。 -->
+<div class="ai-ov" id="aiOv" hidden>
+  <div class="ai-head">
+    <h3 class="ai-title"><em>AI</em> 学情分析</h3>
+    <button class="btn ghost sm" id="aiClose">✕ 关闭（Esc）</button>
+  </div>
+  <div class="ai-bar">
+    <select class="ai-inp" id="aiProv" aria-label="模型厂商"></select>
+    <input class="ai-inp" id="aiModel" placeholder="模型名" aria-label="模型名" spellcheck="false" autocomplete="off">
+    <input class="ai-inp" id="aiKey" type="password" placeholder="粘贴 API Key（只存在这台电脑上）"
+           aria-label="API Key" autocomplete="off">
+    <button class="ai-run" id="aiRun">开始分析</button>
+    <span class="ai-state" id="aiState">就绪</span>
+  </div>
+  <div class="ai-bar sub">
+    <input class="ai-inp" id="aiBase" placeholder="接口地址（换网关时才改）" aria-label="接口地址"
+           spellcheck="false" autocomplete="off">
+    <input class="ai-inp" id="aiNote" aria-label="补充说明"
+           placeholder="补充说明（可选）：今天网络不稳 / 这是复习课 / 学生第一次用电脑……">
+  </div>
+  <div class="ai-body" id="aiBody"></div>
+  <div class="ai-foot">
+    <span id="aiMeta">Key 只存在本机浏览器 · 请求经本机服务器转发，不经任何第三方 · 结论仅供参考</span>
+    <button class="btn ghost sm" id="aiCopy" disabled>复制结果</button>
+  </div>
 </div>
 <!-- #endif -->
 
@@ -730,6 +811,63 @@ function paintNet() {
 
 /* ================= 教师端 ================= */
 /* #if T */
+/* ---------- 学情 AI 分析：厂商预设 ----------
+   除 Anthropic 与 Gemini，其余全是「OpenAI 兼容」协议，差别只在 base 与模型名，
+   所以老师只需要选厂商 + 粘 key。默认 DeepSeek：国内直连、便宜、中文好。 */
+const AI_PROVIDERS = [
+  { id: 'deepseek', name: 'DeepSeek（默认）', mode: 'openai',
+    base: 'https://api.deepseek.com', model: 'deepseek-chat',
+    hint: 'platform.deepseek.com 申请' },
+  { id: 'qwen', name: '通义千问 · 百炼', mode: 'openai',
+    base: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus',
+    hint: 'bailian.console.aliyun.com 申请' },
+  { id: 'kimi', name: 'Kimi · 月之暗面', mode: 'openai',
+    base: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k',
+    hint: 'platform.moonshot.cn 申请' },
+  { id: 'zhipu', name: '智谱 GLM', mode: 'openai',
+    base: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash',
+    hint: 'bigmodel.cn 申请，glm-4-flash 有免费额度' },
+  { id: 'ark', name: '豆包 · 火山方舟', mode: 'openai',
+    base: 'https://ark.cn-beijing.volces.com/api/v3', model: 'doubao-pro-32k',
+    hint: '方舟控制台申请，模型名填你开通的推理接入点' },
+  { id: 'siliconflow', name: '硅基流动', mode: 'openai',
+    base: 'https://api.siliconflow.cn/v1', model: 'deepseek-ai/DeepSeek-V3',
+    hint: 'cloud.siliconflow.cn 申请' },
+  { id: 'openai', name: 'OpenAI', mode: 'openai',
+    base: 'https://api.openai.com/v1', model: 'gpt-4o-mini',
+    hint: 'platform.openai.com 申请（需能出网）' },
+  { id: 'openrouter', name: 'OpenRouter', mode: 'openai',
+    base: 'https://openrouter.ai/api/v1', model: 'deepseek/deepseek-chat',
+    hint: 'openrouter.ai 申请，一个 key 调各家模型' },
+  { id: 'anthropic', name: 'Claude · Anthropic', mode: 'anthropic',
+    base: 'https://api.anthropic.com/v1', model: 'claude-3-5-haiku-latest',
+    hint: 'console.anthropic.com 申请' },
+  { id: 'gemini', name: 'Gemini · Google', mode: 'gemini',
+    base: 'https://generativelanguage.googleapis.com/v1beta', model: 'gemini-2.0-flash',
+    hint: 'aistudio.google.com 申请' },
+  { id: 'ollama', name: 'Ollama 本机', mode: 'openai',
+    base: 'http://127.0.0.1:11434/v1', model: 'qwen2.5:7b', noKey: true,
+    hint: '本机先 ollama pull 一个模型，不用 key，也不出网' },
+  { id: 'custom', name: '自定义接口', mode: 'openai',
+    base: '', model: '', hint: '填自己的接口地址，如学校的一体化网关' }
+];
+
+const AI_SYS = [
+  '你是一位资深的 K-12 教研员，擅长从课堂实时数据里看出教学问题。',
+  '老师会给你一节闯关课的班级数据（每关一个知识点，学生逐关闯）。',
+  '请据此写一份课后分析，直接给这位老师看。',
+  '',
+  '输出格式（严格照此，不要加前言和结束语）：',
+  '**总评**：一句话，不超过 40 字。',
+  '**关键发现**：3–5 条，每条以「- 」开头，必须带具体人数或比例。',
+  '**卡点诊断**：1–2 条，说清哪一关最卡、可能原因、下节课怎么补。',
+  '**下一步建议**：3 条，写清老师明天这一环节具体做什么。',
+  '**值得表扬**：1 条，具体到哪个组或哪位学生。',
+  '',
+  '硬要求：只用给到的数据说话，数据不足就写「数据不足」，绝不编造；',
+  '不要复述我的要求，不要用「作为一名教师」这类套话；总字数 400–600 字；用中文。'
+].join('\n');
+
 const T = {
   code: '', cfg: null, open: [1], sec: 0, run: false, _tlv: 0,
   stu: {}, guests: {}, gscore: {}, wallAll: false, cvView: 'run', _qrUrl: '',
@@ -784,12 +922,17 @@ const T = {
       $$('.tab').forEach(t => t.classList.toggle('on', t.id === 'tab-' + tab));
       /* 全屏看板盖住整个视口，切页签时先收掉，不然它会挂在新页上 */
       if (this.wallAll) this.wallAllOff();
+      if (this.aiIsOpen()) this.aiClose();
     });
 
     $('#btnWallAll').onclick = () => this.wallAllOn();
     $('#woClose').onclick = () => this.wallAllOff();
+    $('#btnAI').onclick = () => this.aiOpen();
     document.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && this.wallAll) this.wallAllOff();
+      if (e.key !== 'Escape') return;
+      /* AI 面板是最后打开的，Esc 先关它，再轮到看板 */
+      if (this.aiIsOpen()) { this.aiClose(); return; }
+      if (this.wallAll) this.wallAllOff();
     });
 
     $$('#cvSeg button').forEach(b => b.onclick = () => this.cv(b.dataset.cv));
@@ -1088,6 +1231,268 @@ const T = {
       '<td>' + new Date(s.seen || Date.now()).toLocaleTimeString('zh-CN') + '</td></tr>').join(''));
     const em = $('#t-data-empty');
     if (em) em.hidden = arr.length > 0;
+  },
+
+  /* ================= 学情 · AI 分析 =================
+     数据 → 紧凑文本 → 本机 sync_server 转发 → 厂商 SSE → 边收边画。
+     只有「本机 → 厂商」这一段出网；Key 存在本机浏览器，不经过任何第三方中转。 */
+  aiState0() {
+    if (!this._ai) {
+      const s = Store.get('llm', {}) || {};
+      this._ai = { p: s.p || 'deepseek', base: s.base || '', model: s.model || '',
+                   key: s.key || '', note: s.note || '' };
+      this._aiText = '';
+    }
+    return this._ai;
+  },
+  aiSave() { Store.set('llm', this._ai); },
+  aiProv() { const s = this.aiState0(); return AI_PROVIDERS.find(p => p.id === s.p) || AI_PROVIDERS[0]; },
+  aiName(s) { return this.cfg.real === false ? ('同学' + String(s.id).slice(-2)) : s.name; },
+
+  aiOpen() {
+    const ov = $('#aiOv'); if (!ov) return;
+    const s = this.aiState0();
+    const sel = $('#aiProv');
+    if (!sel.dataset.done) {
+      sel.innerHTML = AI_PROVIDERS.map(p => '<option value="' + p.id + '">' + p.name + '</option>').join('');
+      sel.dataset.done = '1';
+      sel.onchange = () => this.aiUseProv(sel.value);
+      $('#aiModel').oninput = () => { s.model = $('#aiModel').value.trim(); this.aiSave(); };
+      $('#aiBase').oninput = () => { s.base = $('#aiBase').value.trim(); this.aiSave(); };
+      $('#aiKey').oninput = () => { s.key = $('#aiKey').value.trim(); this.aiSave(); };
+      $('#aiNote').oninput = () => { s.note = $('#aiNote').value; this.aiSave(); };
+      $('#aiRun').onclick = () => this.aiRun();
+      $('#aiClose').onclick = () => this.aiClose();
+      $('#aiCopy').onclick = () => this.aiCopy();
+    }
+    const p = this.aiProv();
+    sel.value = p.id;
+    $('#aiBase').value = s.base || p.base || '';
+    $('#aiModel').value = s.model || p.model || '';
+    $('#aiKey').value = s.key || '';
+    $('#aiNote').value = s.note || '';
+    $('#aiCopy').disabled = !this._aiText;
+    $('#aiState').textContent = this._aiText ? '上次结果' : '就绪';
+    ov.hidden = false;
+    this.aiEmpty();
+    if (!this._aiText && !s.key && !p.noKey) setTimeout(() => { const k = $('#aiKey'); if (k) k.focus(); }, 80);
+  },
+  aiClose() { const ov = $('#aiOv'); if (ov) ov.hidden = true; },
+  aiIsOpen() { const ov = $('#aiOv'); return !!(ov && !ov.hidden); },
+
+  /* 换厂商：地址与模型名跟预设走，Key 保留（老师通常只有一个） */
+  aiUseProv(id) {
+    const s = this.aiState0();
+    const p = AI_PROVIDERS.find(x => x.id === id) || AI_PROVIDERS[0];
+    s.p = p.id;
+    if (p.base) { s.base = p.base; $('#aiBase').value = p.base; }
+    if (p.model) { s.model = p.model; $('#aiModel').value = p.model; }
+    this.aiSave();
+  },
+
+  aiEmpty() {
+    const box = $('#aiBody'); if (!box) return;
+    if (this._aiText) { box.innerHTML = this.aiMd(this._aiText); return; }
+    const p = this.aiProv();
+    box.innerHTML = '<div class="ai-empty">'
+      + '<b>一次点击，让模型读一遍这节课的数据</b><br>'
+      + '① 厂商已默认 <b>DeepSeek</b>，模型名也填好了<br>'
+      + '② 把 API Key 粘到上面那一格（' + esc(p.hint || '到厂商控制台申请') + '）<br>'
+      + '③ 点「开始分析」，结果会边生成边显示<br><br>'
+      + '发给模型的是本机已经收到的学情：报到人数、每关通过人数、各组得分、'
+      + '每个学生卡在哪一关。<b>不会</b>上传任何课件、照片或课堂录像。'
+      + '</div>';
+  },
+
+  /* 组 prompt：摊成一段紧凑文本（比 JSON 省 token，模型也更好读） */
+  aiData(note) {
+    const arr = this.list(), L = CONFIG.LEVELS, G = this.cfg.groups || 8;
+    const on = arr.filter(s => this.online(s)).length;
+    const all = arr.filter(s => (s.done || 0) >= L.length).length;
+    const avg = arr.length ? arr.reduce((a, s) => a + (s.done || 0), 0) / arr.length : 0;
+    const out = [];
+    out.push('【本课】' + (this.cfg.title || CONFIG.APP) + '｜课堂码 ' + this.code
+             + '｜' + new Date().toLocaleString('zh-CN'));
+    out.push('【关卡】' + L.map(l => l.id + '·' + l.name + (l.sub ? '（' + l.sub + '）' : '')).join('；'));
+    out.push('【规模】分 ' + G + ' 组；报到 ' + arr.length + ' 人，在线 ' + on
+             + ' 人，离线 ' + (arr.length - on) + ' 人');
+    out.push('【总体】全通关 ' + all + ' 人；平均每人已过 ' + avg.toFixed(1) + '/' + L.length
+             + ' 关（完成率 ' + Math.round(avg / L.length * 100) + '%）；举手求助 '
+             + arr.filter(s => s.help).length + ' 人');
+    out.push('【每关通过人数】');
+    let prev = arr.length;
+    L.forEach(lv => {
+      const n = arr.filter(s => (s.done || 0) >= lv.id).length;
+      const drop = prev - n;
+      out.push('  第' + lv.id + '关 ' + lv.name + '：' + n + '/' + arr.length + ' 人'
+               + (drop > 0 ? '（比上一关少 ' + drop + ' 人）' : ''));
+      prev = n;
+    });
+    out.push('【各组】');
+    for (let g = 1; g <= G; g++) {
+      const mem = arr.filter(s => s.g === g);
+      if (!mem.length) { out.push('  第' + g + '组：无人报到'); continue; }
+      const d = mem.reduce((a, s) => a + (s.done || 0), 0) / mem.length;
+      const sc = mem.reduce((a, s) => a + (s.score || 0), 0) + (this.gscore[g] || 0);
+      out.push('  第' + g + '组：' + mem.length + ' 人，平均已过 ' + d.toFixed(1)
+               + ' 关，组内积分 ' + sc + '，全通关 '
+               + mem.filter(s => (s.done || 0) >= L.length).length + ' 人');
+    }
+    out.push('【学生明细】姓名｜组｜已过关｜积分｜当前关｜状态');
+    arr.forEach(s => {
+      out.push('  ' + this.aiName(s) + '｜' + s.g + '｜' + (s.done || 0) + '/' + L.length
+               + '｜' + (s.score || 0) + '｜第' + (s.lv || 1) + '关｜'
+               + (s.help ? '举手求助' : (this.online(s) ? '在学' : '离线')));
+    });
+    if (note) out.push('【老师补充】' + note);
+    return out.join('\n');
+  },
+
+  aiRun() {
+    if (this._aiBusy) return;
+    const s = this.aiState0(), p = this.aiProv();
+    const key = ($('#aiKey').value || '').trim();
+    const model = ($('#aiModel').value || '').trim();
+    const base = ($('#aiBase').value || '').trim();
+    if (!base) { this.aiFail('接口地址空了——选个厂商，或自己填一个'); return; }
+    if (!model) { this.aiFail('模型名空了'); return; }
+    if (!key && !p.noKey) { this.aiFail('先粘贴 API Key'); $('#aiKey').focus(); return; }
+    if (!this.list().length) { this.aiFail('还没有学生报到，没有可分析的数据'); return; }
+    if (location.protocol === 'file:') {
+      this.aiFail('AI 分析要走本机服务器转发：请用 start_server 启动后打开 http://127.0.0.1:8099/t。'
+                  + '直接双击 HTML（file://）时浏览器不允许跨域请求厂商接口。');
+      return;
+    }
+
+    s.key = key; s.model = model; s.base = base; this.aiSave();
+
+    this._aiBusy = true; this._aiText = ''; this._aiErr = '';
+    const run = $('#aiRun');
+    run.disabled = true; run.textContent = '分析中…';
+    $('#aiCopy').disabled = true;
+    $('#aiBody').innerHTML = '<div class="ai-empty">正在把数据交给 ' + esc(p.name)
+      + ' 分析…（一般 5–20 秒，会边写边显示）</div>';
+
+    const t0 = Date.now();
+    this._aiTimer = setInterval(() => {
+      if (!this._aiBusy) return;
+      $('#aiState').textContent = '分析中 ' + Math.round((Date.now() - t0) / 1000) + 's';
+    }, 500);
+    $('#aiState').textContent = '已连接…';
+
+    fetch('/api/llm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: p.mode, base: base, model: model, key: key,
+                             system: AI_SYS, prompt: this.aiData(s.note), stream: true })
+    }).then(res => {
+      const ct = res.headers.get('Content-Type') || '';
+      if (ct.indexOf('event-stream') < 0) {
+        return res.json().catch(() => ({})).then(j => {
+          throw new Error((j && j.err) || ('本机服务器返回 ' + res.status
+            + '——是不是没通过 start_server 打开？'));
+        });
+      }
+      return this.aiPump(res.body.getReader(), t0);
+    }).catch(e => this.aiFail(e && e.message ? e.message : String(e)));
+  },
+
+  /* 读流：服务端已把三家协议归一化成 data:{"t":…}，这里只认这一种 */
+  aiPump(reader, t0) {
+    const dec = new TextDecoder('utf-8');
+    let buf = '';
+    const frame = o => {
+      if (o.t) { this._aiText += o.t; this.aiPaintSoon(); }
+      if (o.err) this._aiErr = o.err;
+    };
+    const step = () => reader.read().then(({ done, value }) => {
+      if (done) {
+        clearInterval(this._aiTimer);
+        this._aiBusy = false;
+        const run = $('#aiRun'); run.disabled = false; run.textContent = '重新分析';
+        if (this._aiErr) return this.aiFail(this._aiErr);
+        if (!this._aiText) return this.aiFail('模型没有返回内容——检查模型名、Key 与接口地址');
+        $('#aiState').textContent = '完成 · ' + this._aiText.length + ' 字 · '
+          + Math.round((Date.now() - t0) / 1000) + 's';
+        $('#aiCopy').disabled = false;
+        this.aiPaint();
+        return;
+      }
+      buf += dec.decode(value, { stream: true });
+      const blocks = buf.split('\n\n');
+      buf = blocks.pop();              // 最后一段可能被切断，留到下一轮
+      blocks.forEach(b => b.split('\n').forEach(line => {
+        line = line.trim();
+        if (line.indexOf('data:') !== 0) return;
+        try { frame(JSON.parse(line.slice(5).trim())); } catch (e) { }
+      }));
+      return step();
+    }).catch(e => {
+      clearInterval(this._aiTimer);
+      this.aiFail('读流中断：' + (e && e.message ? e.message : e));
+    });
+    return step();
+  },
+
+  /* 边收边画：一帧最多重排一次（一个回答 150~300 帧，逐帧 innerHTML 会卡） */
+  aiPaintSoon() {
+    if (this._aiRaf) return;
+    this._aiRaf = requestAnimationFrame(() => { this._aiRaf = 0; this.aiPaint(); });
+  },
+  aiPaint() {
+    const box = $('#aiBody'); if (!box) return;
+    const nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 90;
+    box.innerHTML = this.aiMd(this._aiText) + (this._aiBusy ? '<span class="ai-caret"></span>' : '');
+    if (nearBottom) box.scrollTop = box.scrollHeight;
+  },
+
+  aiFail(msg) {
+    this._aiBusy = false;
+    clearInterval(this._aiTimer);
+    const run = $('#aiRun');
+    if (run) { run.disabled = false; run.textContent = this._aiText ? '重新分析' : '开始分析'; }
+    const st = $('#aiState'); if (st) st.textContent = '出错';
+    const box = $('#aiBody');
+    if (box) {
+      box.innerHTML = (this._aiText ? this.aiMd(this._aiText) : '')
+        + '<div class="ai-err">⚠ ' + esc(String(msg)) + '</div>';
+      box.scrollTop = box.scrollHeight;
+    }
+    toast('AI 分析失败：' + String(msg).slice(0, 46));
+  },
+
+  aiCopy() {
+    if (!this._aiText) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(this._aiText)
+        .then(() => toast('分析结果已复制'))
+        .catch(() => toast('浏览器不允许复制，请手动选中'));
+    } else toast('浏览器不允许复制，请手动选中');
+  },
+
+  /* 极简 markdown：只认 **加粗**、- 列表、# 标题、空行分段 */
+  aiMd(t) {
+    if (!t) return '';
+    const inl = s => esc(s)
+      .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+      .replace(/`([^`]+)`/g, '<b>$1</b>');
+    let out = '', list = false;
+    String(t).split(/\r?\n/).forEach(raw => {
+      const line = raw.trim();
+      if (!line) { if (list) { out += '</ul>'; list = false; } return; }
+      const h = line.match(/^#{1,6}\s+(.*)$/);
+      if (h) { if (list) { out += '</ul>'; list = false; } out += '<h4>' + inl(h[1]) + '</h4>'; return; }
+      const li = line.match(/^(?:[-*•]|\d+[.、)])\s+(.*)$/);
+      if (li) {
+        if (!list) { out += '<ul>'; list = true; }
+        out += '<li>' + inl(li[1]) + '</li>';
+        return;
+      }
+      if (list) { out += '</ul>'; list = false; }
+      out += '<p>' + inl(line) + '</p>';
+    });
+    if (list) out += '</ul>';
+    return out;
   },
 
   /* ---------- 全屏看板 ---------- */

@@ -23,6 +23,8 @@ import select
 import socket
 import sys
 import threading
+import urllib.error
+import urllib.request
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs, quote
 
@@ -122,6 +124,139 @@ def best_lan_ip(ips=None):
     return sorted(ips, key=lambda i: (score(i), i))[0] if ips else ""
 
 
+# ======================================================================
+# /api/llm —— 学情 AI 分析的大模型转发
+# ----------------------------------------------------------------------
+# 为什么必须走服务端转发，而不是页面里直接 fetch 厂商接口：
+#   1. CORS：OpenAI / 智谱 / 豆包等都不允许浏览器跨域直呼，页面里 fetch 直接被拦；
+#   2. 浏览器直连会把 Key 暴露在页面上下文里，也绕不过某些厂商对 Referer 的限制。
+# 本机服务器转发一次，页面只跟同源打交道，Key 也只发给自己这台机器。
+#
+# 协议：POST /api/llm  {mode, base, model, key, system, prompt, stream}
+#   mode = openai（含 DeepSeek/Kimi/通义/GLM/豆包/硅基流动/Ollama…）
+#        | anthropic | gemini
+# 回包：text/event-stream，每帧 data: {"t":"增量文字"}
+#       出错 data: {"err":"..."} ；结束 data: {"done":1,"chars":N}
+# ======================================================================
+
+LLM_MAX_BODY = 512 * 1024        # 提示词最多 512 KB，够塞一整班明细
+LLM_TIMEOUT = 240                # 推理模型可能要几十秒，别用默认的 30 秒掐断
+LLM_MAX_TOKENS = 2000
+
+# 只允许 https，本机（Ollama / LM Studio / one-api 网关）才放行 http。
+# 不这么做等于给局域网开了一个任意 http 请求的代理，学生也能拿它去打内网设备。
+LOOPBACK_HOSTS = ("127.0.0.1", "localhost", "::1", "0.0.0.0")
+
+
+def llm_url(base, mode, model, stream):
+    u = urlparse(base or "")
+    if u.scheme not in ("http", "https") or not u.hostname:
+        raise ValueError("接口地址不合法：%s" % (base or "（空）"))
+    if u.scheme == "http" and u.hostname not in LOOPBACK_HOSTS:
+        raise ValueError("为安全起见只允许 https 接口；本机模型可用 http://127.0.0.1:端口")
+    b = (base or "").rstrip("/")
+    if mode == "anthropic":
+        return b + "/messages"
+    if mode == "gemini":
+        verb = ":streamGenerateContent?alt=sse" if stream else ":generateContent"
+        return b + "/models/" + quote(model or "") + verb
+    # openai 兼容：base 可能写成 https://api.deepseek.com，也可能带 /v1
+    return b + "/chat/completions"
+
+
+def llm_headers(mode, key, stream):
+    h = {"Content-Type": "application/json"}
+    if stream:
+        h["Accept"] = "text/event-stream"
+    if mode == "anthropic":
+        # anthropic-version 是必填；browser-access 头是官方给前端直呼的开关，
+        # 这里虽然走服务端，但有些网关会照着这个头做校验，留着无害。
+        h["x-api-key"] = key
+        h["anthropic-version"] = "2023-06-01"
+        h["anthropic-dangerous-direct-browser-access"] = "true"
+    elif mode == "gemini":
+        h["x-goog-api-key"] = key
+    elif key:
+        h["Authorization"] = "Bearer " + key
+    return h
+
+
+def llm_payload(mode, model, system, prompt, stream):
+    if mode == "anthropic":
+        return {"model": model, "system": system, "max_tokens": LLM_MAX_TOKENS,
+                "temperature": 0.6, "stream": stream,
+                "messages": [{"role": "user", "content": prompt}]}
+    if mode == "gemini":
+        # Gemini 没有独立的 system 字段（1.5 之后有 systemInstruction，但各家代理
+        # 支持不一），直接把系统提示拼在正文前面最稳。
+        return {"contents": [{"role": "user",
+                              "parts": [{"text": system + "\n\n" + prompt}]}],
+                "generationConfig": {"temperature": 0.6,
+                                     "maxOutputTokens": LLM_MAX_TOKENS}}
+    return {"model": model, "stream": stream, "temperature": 0.6,
+            "max_tokens": LLM_MAX_TOKENS,
+            "messages": [{"role": "system", "content": system},
+                         {"role": "user", "content": prompt}]}
+
+
+def llm_text(mode, obj):
+    """从一帧里抠出增量文字。三种协议各一个分支，其余一律返回空串。"""
+    if not isinstance(obj, dict):
+        return ""
+    if mode == "anthropic":
+        if obj.get("type") == "content_block_delta":
+            return (obj.get("delta") or {}).get("text") or ""
+        parts = obj.get("content")            # 非流式回包
+        if isinstance(parts, list):
+            return "".join(p.get("text") or "" for p in parts if isinstance(p, dict))
+        return ""
+    if mode == "gemini":
+        cands = obj.get("candidates") or []
+        if not cands:
+            return ""
+        parts = ((cands[0] or {}).get("content") or {}).get("parts") or []
+        return "".join(p.get("text") or "" for p in parts if isinstance(p, dict))
+    choices = obj.get("choices") or []
+    if not choices:
+        return ""
+    c = choices[0] or {}
+    d = c.get("delta") or c.get("message") or {}
+    return d.get("content") or ""
+
+
+_OPENERS = {}
+
+
+def llm_open(url, data, headers, timeout):
+    """发请求。本机地址（Ollama / 本地网关）一律直连，走代理会连不上自己；
+    外网地址沿用系统代理设置（有些学校/单位只有代理才出得去，浏览器能开页面就说明代理是通的）。"""
+    host = (urlparse(url).hostname or "").lower()
+    loop = host in LOOPBACK_HOSTS or host.startswith("127.")
+    k = "direct" if loop else "env"
+    if k not in _OPENERS:
+        _OPENERS[k] = (urllib.request.build_opener(urllib.request.ProxyHandler({}))
+                       if loop else urllib.request.build_opener())
+    return _OPENERS[k].open(
+        urllib.request.Request(url, data=data, method="POST", headers=headers), timeout=timeout)
+
+
+def llm_err_text(raw):
+    """把上游的错误回包压成一行人话（各家格式不一样，能取到什么取什么）。"""
+    try:
+        o = json.loads(raw)
+    except Exception:
+        return raw.strip()[:300]
+    if isinstance(o, dict):
+        e = o.get("error")
+        if isinstance(e, dict):
+            return str(e.get("message") or e.get("type") or e)[:300]
+        if e:
+            return str(e)[:300]
+        if o.get("message"):
+            return str(o["message"])[:300]
+    return raw.strip()[:300]
+
+
 PAGE = """<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>课堂同步服务器</title>
 <style>
@@ -143,8 +278,8 @@ code{background:#e8efe9;border-radius:5px;padding:1px 6px}
 <h1>课堂同步服务器</h1>
 <div class="sub">%s ｜ 在线客户端 %d ｜ 已转发消息 %d</div>
 %s
-<div class="foot">学生机请用<b>同一局域网</b>打开 /s；教师机建议用 <code>http://127.0.0.1:端口/t</code> 打开——<br>
-局域网 IP 是 http 非安全上下文，浏览器会直接禁用摄像头/麦克风这类 API。<br>
+<div class="foot">学生机请用<b>同一局域网</b>打开 /s；教师机请用 <code>http://127.0.0.1:端口/t</code> 打开——<br>
+局域网 IP 属于非安全上下文，浏览器会直接禁用摄像头，第 17 页「训练AI」就开不了摄像头。<br>
 频道：<code>%s</code></div></body></html>
 """
 
@@ -196,10 +331,10 @@ class Handler(SimpleHTTPRequestHandler):
 
     # ---------- Range 支持（视频/大图必须） ----------
     # 标准库的 SimpleHTTPRequestHandler 只认「整个文件 200」，不认 Range。
-    # 这带来一个很隐蔽的坑：页面上只要有一个 <video preload="metadata">，
-    # 浏览器只能拿到 200 + 完整 Content-Length，于是它老实把整段视频拉下来，
-    # 占着连接不放，期间同源的其他请求全部排队 —— 实测切页要等十几秒。
-    # 补上 206 之后，浏览器只要一小段就能拿到 moov、随即断开，切页回到 100~200 ms。
+    # 这带来一个很隐蔽的坑：授课第 2 页是视频页（<video preload="metadata">），
+    # 浏览器只能拿到 200 + 完整 Content-Length，于是它老实把 43 MB 的开场片整个拉下来，
+    # 占着连接不放，期间同源的其他请求全部排队 —— 实测翻到第 3 页要等 11~13 秒。
+    # 补上 206 之后，浏览器只要一小段就能拿到 moov、随即断开，翻页回到 100~200 ms。
     _ranges_ok = False
 
     def end_headers(self):
@@ -345,7 +480,10 @@ class Handler(SimpleHTTPRequestHandler):
         return super().do_GET()
 
     def do_POST(self):
-        if urlparse(self.path).path != "/send":
+        p = urlparse(self.path).path
+        if p == "/api/llm":
+            return self._llm()
+        if p != "/send":
             return self._json(404, {"ok": False, "err": "not found"})
         try:
             n = int(self.headers.get("Content-Length") or 0)
@@ -409,9 +547,9 @@ class Handler(SimpleHTTPRequestHandler):
             files = []
         for f in sorted(files, key=lambda x: (0 if "教师端" in x else (1 if "学生端" in x else 2), x)):
             if "教师端" in f:
-                # 教师机优先走本机回环：局域网 IP 是 http 非安全上下文，摄像头之类的 API 会被禁用
+                # 教师机必须走本机回环：局域网 IP 是 http 非安全上下文，浏览器会禁用摄像头
                 url = "http://127.0.0.1:%d/t" % self.server.server_port
-                tag, desc = "教师机打开", "大屏 · 学情 · 控制台（本机回环，安全上下文）"
+                tag, desc = "教师机打开", "大屏 · 控制台 · 学情 · 授课（摄像头只在本机回环下可用）"
             elif "学生端" in f:
                 url, tag, desc = "/s", "学生机打开", "输入课堂码报到 · 闯关 · 证书"
             else:
@@ -429,6 +567,130 @@ class Handler(SimpleHTTPRequestHandler):
         self._cors()
         self.end_headers()
         self.wfile.write(body)
+
+    # ---------- 学情 AI 分析：转发到厂商 ----------
+    def _llm(self):
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            n = 0
+        if n <= 0:
+            return self._json(411, {"ok": False, "err": "length required"})
+        if n > LLM_MAX_BODY:
+            return self._json(413, {"ok": False, "err": "提示词太大（%d 字节）" % n})
+        try:
+            req = json.loads(self.rfile.read(n).decode("utf-8"))
+            mode = str(req.get("mode") or "openai").strip().lower()
+            if mode not in ("openai", "anthropic", "gemini"):
+                raise ValueError("mode 只支持 openai / anthropic / gemini")
+            base = str(req.get("base") or "").strip()
+            model = str(req.get("model") or "").strip()
+            key = str(req.get("key") or "").strip()
+            system = str(req.get("system") or "")
+            prompt = str(req.get("prompt") or "")
+            stream = bool(req.get("stream", True))
+            if not prompt.strip():
+                raise ValueError("prompt 为空")
+            if mode != "openai" and not model:
+                raise ValueError("缺模型名")
+            url = llm_url(base, mode, model, stream)
+        except Exception as e:                      # noqa: BLE001
+            return self._json(400, {"ok": False, "err": "%s" % e})
+
+        data = json.dumps(llm_payload(mode, model, system, prompt, stream),
+                          ensure_ascii=False).encode("utf-8")
+        try:
+            resp = llm_open(url, data, llm_headers(mode, key, stream), LLM_TIMEOUT)
+        except urllib.error.HTTPError as e:
+            return self._json(200, {"ok": False,
+                                    "err": "上游 %d：%s" % (e.code, llm_err_text(
+                                        e.read().decode("utf-8", "replace")))})
+        except Exception as e:                      # noqa: BLE001
+            return self._json(200, {"ok": False, "err": "连不上 %s（%s）"
+                                    % (urlparse(url).hostname or "?", e)})
+
+        if not stream:
+            try:
+                raw = resp.read().decode("utf-8", "replace")
+            finally:
+                try:
+                    resp.close()
+                except Exception:                   # noqa: BLE001
+                    pass
+            txt = ""
+            try:
+                txt = llm_text(mode, json.loads(raw))
+            except Exception:                       # noqa: BLE001
+                for line in raw.splitlines():
+                    line = line.strip()
+                    if line.startswith("data:"):
+                        try:
+                            txt += llm_text(mode, json.loads(line[5:].strip()))
+                        except Exception:           # noqa: BLE001
+                            pass
+            if not txt:
+                return self._json(200, {"ok": False,
+                                        "err": "上游没返回文字：%s" % llm_err_text(raw)})
+            return self._json(200, {"ok": True, "text": txt})
+
+        # 流式：三家的 SSE 一律归一化成 data: {"t": "…"}，页面只认这一种
+        self.close_connection = True
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        self.send_header("X-Accel-Buffering", "no")
+        self.send_header("Transfer-Encoding", "chunked")
+        self._cors()
+        self.end_headers()
+
+        def emit(obj):
+            self._chunk(("data: %s\n\n" % json.dumps(obj, ensure_ascii=False)).encode("utf-8"))
+
+        chars, bad = 0, ""
+        try:
+            for raw in resp:
+                line = raw.decode("utf-8", "replace").strip()
+                if not line or not line.startswith("data:"):
+                    continue
+                chunk = line[5:].strip()
+                if chunk == "[DONE]":
+                    break
+                try:
+                    obj = json.loads(chunk)
+                except Exception:                   # noqa: BLE001
+                    continue
+                if isinstance(obj, dict) and obj.get("error"):
+                    bad = llm_err_text(chunk)
+                    emit({"err": bad})
+                    break
+                t = llm_text(mode, obj)
+                if t:
+                    chars += len(t)
+                    emit({"t": t})
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, OSError):
+            pass
+        finally:
+            try:
+                resp.close()
+            except Exception:                       # noqa: BLE001
+                pass
+            # 一句字都没吐：多半是模型名/Key 不对，别让页面停在「分析中…」
+            if not chars and not bad:
+                try:
+                    emit({"err": "上游没有返回内容——检查模型名、Key 与接口地址"})
+                except Exception:                   # noqa: BLE001
+                    pass
+            try:
+                emit({"done": 1, "chars": chars})
+            except Exception:                       # noqa: BLE001
+                pass
+            # 补上 chunked 的结束块：不写这一句，浏览器 fetch 读流会当成「连接被掐断」，
+            # 而 http.client 直接抛 IncompleteRead（探针就栽在这）。
+            try:
+                self.wfile.write(b"0\r\n\r\n")
+                self.wfile.flush()
+            except Exception:                       # noqa: BLE001
+                pass
 
 
 class QuietServer(ThreadingHTTPServer):
@@ -522,7 +784,7 @@ def main():
         print("  学生机  http://%s:%d/s      ← 让全班输入这个" % (ips[0], port))
         print("  教师机  http://127.0.0.1:%d/t    ← 你自己打开这个（本机回环）" % port)
         print("          ↑ 别用 http://%s:%d/t ：局域网 IP 不是安全上下文，" % (ips[0], port))
-        print("            浏览器会禁用摄像头/麦克风；不需要这些能力时用哪个都行。")
+        print("            浏览器会直接禁用摄像头，第 17 页「训练AI」就开不了摄像头。")
         print("  首页    http://%s:%d/" % (ips[0], port))
         if len(ips) > 1:
             print("  其他网卡：%s" % ", ".join(ips[1:]))
