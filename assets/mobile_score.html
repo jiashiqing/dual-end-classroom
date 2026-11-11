@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<!--
+  加分台 · 手机端（教师机「加分」页右栏的二维码指向这里：/m?code=2048）
+  ---------------------------------------------------------------------
+  为什么单独做一个页面，而不是让手机打开教师端：
+  教师端是给投屏用的整页布局，手机上是缩成一张看不清的图，按钮根本点不准；
+  而且教师端要投屏、要开摄像头，不该在手机浏览器里再开一份。
+
+  数据流（教师机是唯一记账方）：
+    手机 POST /send {t:'mscore',g,d}  →  教师机（/send 广播到本班频道）
+    教师机收到后 addScore() 落账，再广播 {t:'gpts',n,pts}（这一页据它重画），
+    心跳里也带一份 pts，所以漏一条也能自己补上。
+  两台手机同时点、或者手机和教师机同时点，分数都不会各算各的。
+
+  零依赖、零外链：只在本机服务器下工作（相对路径 /send、/events）。
+  注意：这个注释里不能出现「连续两个减号 + 右尖括号」，否则注释会被浏览器提前
+  截断，整段变成页面正文（踩过，手机上顶着一大段说明文字）。
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F4F8F6">
+<title>小组加分台</title>
+<style>
+  :root{
+    --bg:#F4F8F6; --card:#FFFFFF; --line:#E1EAE5; --ink:#17281F;
+    --muted:#6B7D74; --main:#16794F; --main-2:#0F5C3B; --warn:#C2410C;
+    --gold:#B8860B; --goldbg:#FDF8E6;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    padding:0 0 env(safe-area-inset-bottom);
+  }
+  header{
+    position:sticky;top:0;z-index:9;padding:13px 16px 11px;
+    background:rgba(244,248,246,.94);border-bottom:1px solid var(--line);
+    backdrop-filter:blur(8px);
+  }
+  .h1{display:flex;align-items:baseline;gap:9px}
+  .h1 b{font-size:21px;letter-spacing:.01em}
+  .h1 i{font-style:normal;font-size:13px;color:var(--muted);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sub{display:flex;align-items:center;gap:7px;margin-top:6px;font-size:13px;color:var(--muted)}
+  .dot{width:9px;height:9px;border-radius:50%;background:#B9C6C0;flex:0 0 auto}
+  .dot.on{background:var(--main);box-shadow:0 0 0 4px rgba(22,121,79,.14)}
+  .code{margin-left:auto;font-size:13px;color:var(--main-2);font-weight:700;
+    font-variant-numeric:tabular-nums}
+  .warn{color:var(--warn)}
+
+  main{padding:12px 12px 92px;display:grid;gap:10px}
+  /* 竖屏一列、横屏/平板两列：按钮始终留够一根手指的高度 */
+  @media (min-width:620px){ main{grid-template-columns:1fr 1fr} }
+
+  .c{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px 13px}
+  .c.lead{border-color:#E8D48A;background:var(--goldbg)}
+  .c .hd{display:flex;align-items:center;gap:8px}
+  .c .gn{font-size:19px;font-weight:800}
+  .c.lead .gn{color:var(--gold)}
+  .c .tag{font-size:11px;font-weight:700;color:var(--gold);border:1px solid #E8D48A;
+    border-radius:6px;padding:1px 5px;line-height:1.4}
+  .c .n{margin-left:auto;font-size:32px;font-weight:900;line-height:1;
+    color:var(--main);font-variant-numeric:tabular-nums}
+  .c.lead .n{color:var(--gold)}
+  .c .mem{margin-top:4px;font-size:12px;color:var(--muted)}
+  .ops{display:flex;gap:8px;margin-top:10px}
+  .ops button{
+    flex:1 1 0;height:54px;border-radius:13px;cursor:pointer;font-family:inherit;
+    border:1px solid var(--line);background:#FBFDFB;color:var(--ink);
+    font-size:18px;font-weight:800;transition:transform .06s ease,background .12s ease;
+  }
+  .ops button:active{transform:scale(.96)}
+  .ops .minus{color:var(--warn)}
+  .ops .plus{background:#EAF7F0;border-color:#BFE3D0;color:var(--main-2)}
+  .ops .big{background:#D9F0E4;border-color:#9FD3B8}
+
+  footer{
+    position:fixed;left:0;right:0;bottom:0;padding:11px 16px calc(11px + env(safe-area-inset-bottom));
+    background:rgba(244,248,246,.96);border-top:1px solid var(--line);
+    font-size:12px;color:var(--muted);text-align:center;
+  }
+  .empty{padding:40px 18px;text-align:center;color:var(--muted);font-size:15px;line-height:1.7}
+  .toast{
+    position:fixed;left:50%;bottom:84px;transform:translate(-50%,18px);
+    padding:11px 20px;border-radius:13px;background:var(--main-2);color:#fff;
+    font-size:16px;font-weight:700;opacity:0;pointer-events:none;
+    transition:opacity .18s ease,transform .18s ease;z-index:20;
+  }
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<header>
+  <div class="h1"><b>小组加分台</b><i id="course">—</i></div>
+  <div class="sub">
+    <span class="dot" id="dot"></span><span id="net">连接中…</span>
+    <span class="code" id="code">课堂码 ——</span>
+  </div>
+</header>
+
+<main id="list"><div class="empty">正在和教师机同步…</div></main>
+
+<footer>点一下就给这一组加分 · 分数以教师机为准，几台手机同时点也不会乱</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* 频道前缀必须和 app.src.html 里 Sync.channel 完全一致，否则两边各说各话 */
+  var PREFIX = 'de_v1_';
+  var MYID = 'm' + Math.random().toString(16).slice(2, 10);
+  var qs = new URLSearchParams(location.search);
+  var code = (qs.get('code') || '').replace(/\D/g, '').slice(0, 4);
+  var CH = PREFIX + code;
+
+  var state = { n: 0, pts: {}, title: '', online: false };
+  var lastSig = '';
+
+  var $list = document.getElementById('list');
+  var $dot = document.getElementById('dot');
+  var $net = document.getElementById('net');
+  var $code = document.getElementById('code');
+  var $course = document.getElementById('course');
+  var $toast = document.getElementById('toast');
+  var toastT = 0;
+
+  function toast(msg) {
+    $toast.textContent = msg;
+    $toast.classList.add('on');
+    clearTimeout(toastT);
+    toastT = setTimeout(function () { $toast.classList.remove('on'); }, 1400);
+  }
+
+  function paintNet() {
+    $dot.className = 'dot' + (state.online ? ' on' : '');
+    $net.textContent = state.online ? '已连上教师机' : '没连上教师机 —— 加分发不出去';
+    $net.className = state.online ? '' : 'warn';
+  }
+
+  function total(g) {
+    var p = state.pts[g] || [0, 0];
+    return (+p[0] || 0) + (+p[1] || 0);
+  }
+
+  function leadGroup() {
+    var best = 0, bg = 0;
+    for (var g = 1; g <= state.n; g++) {
+      var t = total(g);
+      if (t > best) { best = t; bg = g; }
+    }
+    return best > 0 ? bg : 0;
+  }
+
+  function render() {
+    if (!code) {
+      $list.innerHTML = '<div class="empty">地址里没有课堂码。<br>请重新扫教师机「加分」页上的二维码。</div>';
+      return;
+    }
+    if (!state.n) { $list.innerHTML = '<div class="empty">等教师机回传组数…</div>'; return; }
+    /* 分数没变就不重建：每 3 秒一次全量重画会让正在按的手指落空 */
+    var sig = state.n + '|' + JSON.stringify(state.pts);
+    if (sig === lastSig) return;
+    lastSig = sig;
+
+    var lead = leadGroup(), html = '';
+    for (var g = 1; g <= state.n; g++) {
+      var isLead = (g === lead);
+      var p = state.pts[g] || [0, 0];
+      html += '<div class="c' + (isLead ? ' lead' : '') + '" data-g="' + g + '">'
+        + '<div class="hd"><span class="gn">第' + g + '组</span>'
+        + (isLead ? '<span class="tag">领先</span>' : '')
+        + '<span class="n">' + total(g) + '</span></div>'
+        + '<div class="mem">自动 ' + ((+p[0]) || 0) + ' · 教师 ' + ((+p[1]) || 0) + '</div>'
+        + '<div class="ops">'
+        + '<button class="minus" data-d="-1">−1</button>'
+        + '<button class="plus" data-d="1">+1</button>'
+        + '<button class="plus big" data-d="5">+5</button>'
+        + '</div></div>';
+    }
+    $list.innerHTML = html;
+  }
+
+  function send(obj) {
+    try {
+      fetch('/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel: CH, sender: MYID, data: JSON.stringify(obj) })
+      }).catch(function () {});
+    } catch (e) {}
+  }
+
+  $list.addEventListener('click', function (ev) {
+    var b = ev.target.closest('.ops button');
+    if (!b) return;
+    var card = b.closest('.c');
+    if (!card) return;
+    var g = +card.dataset.g, d = +b.dataset.d;
+    if (!state.online) { toast('还没连上教师机，等一下再点'); return; }
+    /* 先本地加一下：手机在教室后排，等 3 秒心跳才变会以为没点上。
+       真正的分数仍以教师机广播回来的为准（下一帧就被覆盖）。 */
+    if (!state.pts[g]) state.pts[g] = [0, 0];
+    state.pts[g][1] = (+state.pts[g][1] || 0) + d;
+    lastSig = '';
+    render();
+    send({ t: 'mscore', g: g, d: d });
+    if (navigator.vibrate) { try { navigator.vibrate(12); } catch (e) {} }
+    toast('第' + g + '组 ' + (d > 0 ? '+' : '') + d + ' 分');
+  });
+
+  function onData(raw) {
+    var d;
+    try { d = JSON.parse(raw); } catch (e) { return; }
+    if (!d) return;
+    /* /send 广播回来的是 {sender, data}，data 里才是我们自己发的 JSON 字符串 */
+    var m;
+    try { m = (typeof d.data === 'string') ? JSON.parse(d.data) : d; } catch (e) { return; }
+    if (!m || !m.t) return;
+    /* 自己发的消息会被原样广播回来，不去重会把本地加的那一分加两遍 */
+    if (d.sender === MYID && d.sender) return;
+    if (m.pts) {
+      state.pts = m.pts;
+      if (m.n) state.n = m.n;
+      if (m.cfg && m.cfg.title) { state.title = m.cfg.title; $course.textContent = m.cfg.title; }
+      else if (!state.title) { $course.textContent = '双端课堂'; }
+      lastSig = '';
+      render();
+    }
+  }
+
+  function connect() {
+    if (!code) return;
+    var es = new EventSource('/events?channel=' + encodeURIComponent(CH));
+    es.onopen = function () {
+      state.online = true; paintNet();
+      send({ t: 'askpts' });        // 别等 3 秒心跳，进来就要一份分数
+    };
+    es.onerror = function () { state.online = false; paintNet(); };
+    es.onmessage = function (ev) { onData(ev.data); };
+  }
+
+  if (code) {
+    $code.textContent = '课堂码 ' + code;
+    document.title = '加分台 · ' + code;
+  }
+  $course.textContent = state.title || '双端课堂';
+  paintNet();
+  render();
+  connect();
+  /* 断线不用管：EventSource 按服务器给的 retry 自己重连，连回来会重新 onopen
+     （顺手再要一份分数）。别再手动 connect，否则每 5 秒叠一个 EventSource，
+     同一份分数会收到好几遍。 */
+})();
+</script>
+</body>
+</html>

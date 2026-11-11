@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<!-- v3.1 · 2026-11-10 · 小组积分（冲线 10/7/5 + 整组过关每关 +2 + 教师分，大屏实时榜）/ v3 的学情 AI 分析（12 家厂商 · 默认 DeepSeek · 流式）/ v2 的课前设置（课堂码+二维码）· 自定义组数 · 每关独立时长 · 进度墙+全屏看板 · 证书门闩 -->
+<!-- v4 · 2026-11-11 · 加分独立成页（手机扫 /m 二维码当遥控器）+ 大屏举手抢答（按举手先后编号）+ 学生端本课任务（进课堂弹一次，关掉后顶栏常驻）/ v3.1 小组积分（冲线 10/7/5 + 整组过关每关 +2 + 教师分）/ v3 学情 AI 分析（12 家厂商 · 默认 DeepSeek · 流式）/ v2 课前设置 · 自定义组数 · 每关独立时长 · 进度墙+全屏看板 · 证书门闩 -->
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>双端课堂 · __ROLE_LABEL__ · v3.1</title>
+<title>双端课堂 · __ROLE_LABEL__ · v4</title>
 <style>
 /* 骨架样式：1366×768 起步，正文 ≥16px，主按钮 ≥18px */
 :root{
@@ -270,6 +270,48 @@ table.roster tr:hover td{background:#fbfdfb}
 .gcard .ops button{flex:1 1 auto;padding:5px 0;border-radius:8px;border:1px solid var(--line);background:#fbfdfb;font-size:13px}
 .gcard .ops button:hover{border-color:var(--main);color:var(--main)}
 .gcard .ops button.minus:hover{border-color:var(--warn);color:var(--warn)}
+/* ---------- 加分页（独立页签） ---------- */
+#tab-score.on{display:flex;min-height:0}
+.score-wrap{display:flex;gap:14px;width:100%;min-height:0;flex:1 1 auto}
+.sc-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;min-height:0;
+  background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:13px 16px}
+/* 一屏摆 8 组：三列三行。两列会变四行、最后一张卡被切成半个 */
+.sc-main .gcards{flex:1 1 auto;min-height:0;overflow-y:auto;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  /* 行高均分剩余空间：8 组 = 3 行，auto 行高在 1366 上会顶出 60 多像素 */
+  grid-auto-rows:minmax(0,1fr);align-content:stretch}
+.sc-main .gcard{display:flex;flex-direction:column;justify-content:center;overflow:hidden}
+.sc-main .gcards.dense{grid-template-columns:repeat(4,minmax(0,1fr))}
+.sc-qr{flex:0 0 250px;display:flex;flex-direction:column}
+.sc-qr .qr-tip{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sc-foot{color:var(--muted);font-size:12px;margin-top:8px;flex:0 0 auto}
+/* 举手抢答：名字前的顺序号（谁先举谁小） */
+#t-help .hno{flex:0 0 18px;height:18px;border-radius:9px;background:#e11d48;color:#fff;
+  font-size:11px;font-weight:700;display:grid;place-items:center;font-variant-numeric:tabular-nums}
+/* 本课任务：老师编辑框 + 学生弹窗共用一套外框 */
+.tk-mask{position:fixed;inset:0;background:rgba(23,40,31,.46);display:none;place-items:center;
+  z-index:70;padding:20px}
+.tk-mask.on{display:grid}
+.tk-box{width:min(600px,94vw);max-height:86vh;overflow:auto;background:var(--panel);
+  border-radius:16px;padding:18px 20px;box-shadow:0 18px 48px rgba(11,32,24,.26)}
+.tk-h{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.tk-h h3{margin:0;font-size:18px}
+.tk-badge{font-size:12px;font-weight:700;color:var(--main-2);background:#EAF7F0;
+  border:1px solid #BFE3D0;border-radius:7px;padding:2px 8px}
+.tk-x{margin-left:auto;border:1px solid var(--line);background:#FBFDFB;border-radius:9px;
+  width:30px;height:30px;font-size:15px;line-height:1;cursor:pointer;color:var(--muted)}
+.tk-x:hover{border-color:var(--main);color:var(--main)}
+.tk-title{margin:6px 0 8px;font-size:23px;line-height:1.35}
+.tk-text{font-size:15px;line-height:1.85;color:var(--ink);white-space:normal}
+.tk-f{margin-top:14px;font-size:12px;color:var(--muted)}
+#tkTitleIn{width:100%;padding:9px 11px;font:inherit;font-size:15px;border:1px solid var(--line);
+  border-radius:9px;background:#FBFDFB;outline:none}
+#tkTitleIn:focus{border-color:var(--main);box-shadow:0 0 0 3px rgba(22,121,79,.12)}
+#tkTextIn{width:100%;min-height:150px;margin-top:8px;padding:9px 11px;font:inherit;font-size:14px;
+  line-height:1.7;border:1px solid var(--line);border-radius:9px;background:#FBFDFB;outline:none;resize:vertical}
+#tkTextIn:focus{border-color:var(--main);box-shadow:0 0 0 3px rgba(22,121,79,.12)}
+.tk-ops{display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap}
+
 /* 课前设置三块面板 */
 .set-grid{display:grid;grid-template-columns:340px minmax(0,1fr);gap:14px;align-items:start}
 @media (max-width:900px){.set-grid{grid-template-columns:minmax(0,1fr)}}
@@ -419,6 +461,8 @@ table.roster tr:hover td{background:#fbfdfb}
 <div class="page" id="pg-student">
   <div class="topbar">
     <span class="who" id="s-who">—<small id="s-grp"></small></span>
+    <button class="btn ghost sm" id="s-task-nav" type="button" hidden>任务</button>
+    <button class="btn ghost sm" id="s-help" type="button">🙋 举手</button>
     <span class="pill" id="s-course">双端课堂</span>
     <span class="spacer"></span>
     <span><span class="dot" id="s-net"></span><span id="s-net-tx">离线</span></span>
@@ -439,6 +483,7 @@ table.roster tr:hover td{background:#fbfdfb}
   <div id="t-tabs">
     <button data-tab="board" class="on">大屏</button>
     <button data-tab="data">学情</button>
+    <button data-tab="score">加分</button>
     <button data-tab="ctrl">控制台</button>
   </div>
   <div class="t-body">
@@ -467,7 +512,7 @@ table.roster tr:hover td{background:#fbfdfb}
           <div class="card rc"><h4 class="h4seg"><span id="t-rank-title">小组积分榜</span>
             <span class="seg2" id="t-rank-seg"><button type="button" data-rk="g" class="on">小组</button><button type="button" data-rk="s">个人</button></span>
           </h4><ol id="t-rank"></ol></div>
-          <div class="card hc"><h4>举手求助</h4><div id="t-help"></div></div>
+          <div class="card hc"><h4>举手抢答</h4><div id="t-help"></div></div>
         </div>
       </div>
     </div>
@@ -490,6 +535,27 @@ table.roster tr:hover td{background:#fbfdfb}
           <tbody id="t-data-body"></tbody>
         </table>
         <div class="empty" id="t-data-empty">还没有学生进来</div>
+      </div>
+    </div>
+
+    <!-- ---- 加分：独立一页，课上会反复点 ---- -->
+    <div class="tab" id="tab-score">
+      <div class="score-wrap">
+        <div class="sc-main">
+          <div class="dh">
+            <h3>各组积分</h3>
+            <span class="ph-sub" id="scRule">冲线 10/7/5 · 整组过关每关 +2</span>
+            <span class="msg ph-sub" id="scLead"></span>
+          </div>
+          <div class="gcards" id="t-groups"></div>
+          <div class="sc-foot">点一下只给这一组加这么多分，不按人数乘 · 下课在「学情」页导出小组积分</div>
+        </div>
+        <div class="sp sc-qr">
+          <h4>手机加分</h4>
+          <div class="sub">同一 WiFi 扫码，手机当遥控器</div>
+          <div class="qr-box none" id="qrBoxM"><canvas id="qrCvM" width="240" height="240">二维码</canvas></div>
+          <div class="qr-tip" id="qrMTip">—</div>
+        </div>
       </div>
     </div>
 
@@ -520,7 +586,9 @@ table.roster tr:hover td{background:#fbfdfb}
           </div>
           <div class="lv-list" id="lvCtrl"></div>
         </div>
-        <div class="gcards" id="t-groups"></div>
+        <div class="ph-sub" style="margin-top:10px">
+          给小组加减分搬到顶栏「加分」页了 —— 课上会反复点，挂在控制台里要点两层；那一页还能用手机扫二维码加。
+        </div>
       </div>
 
       <div class="cv" id="cvCfg" hidden>
@@ -564,6 +632,11 @@ table.roster tr:hover td{background:#fbfdfb}
             <div class="sp">
               <h4>投屏与规则</h4>
               <div class="sub">影响大屏和学生端，随时可改</div>
+              <div class="set-row">
+                <label for="btnTask">本课任务</label>
+                <button class="btn sm" id="btnTask" type="button">编辑并发布</button>
+                <span class="ph-sub" id="tkNow" style="flex:1 1 140px">未发布 · 学生进课堂不会弹</span>
+              </div>
               <label class="chk"><input type="checkbox" id="stJump"><span>允许跳关（已放行的关都能点）</span></label>
               <label class="chk"><input type="checkbox" id="stReal"><span>大屏排行榜显示真实姓名</span></label>
             </div>
@@ -572,6 +645,21 @@ table.roster tr:hover td{background:#fbfdfb}
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- ---- 本课任务：老师编辑并下发（学生端进课堂弹一次，之后顶栏「任务」随时再看） ---- -->
+<div class="tk-mask" id="tkOv">
+  <div class="tk-box">
+    <div class="tk-h"><h3>本课任务</h3><button class="tk-x" id="tkClose" type="button" aria-label="关闭">✕</button></div>
+    <input id="tkTitleIn" maxlength="30" placeholder="标题，如「让摄像头认识三种手势」" spellcheck="false">
+    <textarea id="tkTextIn" maxlength="600"
+      placeholder="一条一行，学生看得懂就行。例如：&#10;1. 打开第 3 关&#10;2. 采集三种手势各 30 张&#10;3. 训练后自测 20 次"></textarea>
+    <div class="tk-ops">
+      <button class="btn" id="tkSave" type="button">发布给学生</button>
+      <button class="btn ghost" id="tkClear" type="button">清空任务</button>
+      <span class="ph-sub" id="tkMsg"></span>
+    </div>
   </div>
 </div>
 
@@ -622,6 +710,17 @@ table.roster tr:hover td{background:#fbfdfb}
 
 <!-- ============ 证书 ============ -->
 <!-- #if S -->
+<!-- 本课任务：进课堂弹一次，关掉后点顶栏「任务」再看 -->
+<div class="tk-mask" id="s-task-mask">
+  <div class="tk-box">
+    <div class="tk-h"><span class="tk-badge">本课任务</span>
+      <button class="tk-x" id="s-task-x" type="button" aria-label="关闭">✕</button></div>
+    <h2 class="tk-title" id="s-task-title">—</h2>
+    <div class="tk-text" id="s-task-text"></div>
+    <div class="tk-f">关掉后点顶栏「任务」随时再看 · 做完了举手告诉老师</div>
+  </div>
+</div>
+
 <div class="cert-mask" id="s-cert">
   <div class="cert-box">
     <h2>结 业 证 书</h2>
@@ -665,7 +764,9 @@ const CONFIG = {
 };
 
 const DEFAULTS = {
-  cfg: { title: '', groups: 8, mins: CONFIG.MINS.slice(), jump: false, real: true }
+  cfg: { title: '', groups: 8, mins: CONFIG.MINS.slice(), jump: false, real: true,
+         /* 本课任务：空标题＝没发布。跟着 cfg 一起下发/存档，学生端不用另开通道 */
+         task: { title: '', text: '' } }
 };
 
 /* ================= 工具 ================= */
@@ -803,6 +904,26 @@ const Sync = {
 
 /* 学生机地址：老师机为开摄像头常用 127.0.0.1 打开，location.host 是回环，
    直接显示会误导全班。从 /netinfo 拿服务端挑好的内网地址。 */
+/* 把一段文本画进指定 canvas：每模块取整数像素，非整数会让边缘糊成灰、更难对焦 */
+function qrTo(cv, text) {
+  if (!cv || !text || typeof QRCode === 'undefined') return false;
+  try {
+    const r = QRCode.encode(text, 'M');
+    const n = r.size, q = 4, total = n + q * 2;
+    const px = Math.max(4, Math.floor(660 / total));
+    cv.width = cv.height = total * px;
+    const g = cv.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
+    g.fillStyle = '#0b1220';
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        if (r.modules[y][x]) g.fillRect((x + q) * px, (y + q) * px, px, px);
+      }
+    }
+    return true;
+  } catch (e) { console.warn('[qr]', e); return false; }
+}
+
 const Net = {
   studentUrl: '', ok: false,
   isLoop(host) { return !host || /^(127\.|localhost|\[::1\]|::1$)/i.test(host); },
@@ -821,7 +942,9 @@ const Net = {
         .catch(() => { });
     } catch (e) { }
   },
-  apply() { if (typeof T !== 'undefined') { T.paintStuUrl(); T.paintQR(); } }
+  apply() {
+    if (typeof T !== 'undefined') { T.paintStuUrl(); T.paintQR(); T.paintQRm(); }
+  }
 };
 
 function paintNet() {
@@ -941,6 +1064,7 @@ const T = {
 
     this.bind();
     this.paintSetting();
+    this.paintTaskNow();
     this.paintTimerBtn();
     this.renderLvCtrl();
     this.renderWall(this.list());
@@ -965,6 +1089,8 @@ const T = {
       /* 全屏看板盖住整个视口，切页签时先收掉，不然它会挂在新页上 */
       if (this.wallAll) this.wallAllOff();
       if (this.aiIsOpen()) this.aiClose();
+      /* 加分页隐藏时也能画卡，但二维码要等有地址才画得出来，切过去补一次 */
+      if (tab === 'score') { this.renderGroups(this.list()); this.paintQRm(); }
     });
 
     $('#btnWallAll').onclick = () => this.wallAllOn();
@@ -978,6 +1104,11 @@ const T = {
     });
 
     $$('#cvSeg button').forEach(b => b.onclick = () => this.cv(b.dataset.cv));
+
+    $('#btnTask').onclick = () => this.tkOpen();
+    $('#tkClose').onclick = () => this.tkClose();
+    $('#tkSave').onclick = () => this.tkSave();
+    $('#tkClear').onclick = () => this.tkClear();
 
     $('#t-open').onclick = () => this.openNext();
     $('#t-timer').onclick = () => {
@@ -1070,7 +1201,7 @@ const T = {
   /* ---------- 心跳：一条给本班，一条给大厅 ---------- */
   hb() {
     Sync.send({ t: 'hb', open: this.open, sec: this.sec, run: this.run, cfg: this.cfg,
-                rank: this.rankTop(10) });
+                rank: this.rankTop(10), n: this.cfg.groups, pts: this.ptsMap() });
     /* 大厅那份只带配置和放行：报到页还没有课堂码，连不到本班频道，
        而组按钮正是报到页要用的东西。不带排行榜，别让几十个学生每 3 秒收一遍大块数据。 */
     Sync.send({ t: 'cfg', cfg: this.cfg, open: this.open, code: this.code }, CONFIG.LOBBY);
@@ -1136,6 +1267,9 @@ const T = {
       s.g = clamp(m.g || s.g || 1, 1, this.cfg.groups);
       s.lv = m.lv || s.lv || 1;
       s.done = (m.done == null ? (s.done || 0) : m.done);
+      /* 抢答要按举手先后排队：只在「放下 → 举起」那一刻记时间，
+         放下再举会排到队尾，这才符合课上「重新举手」的直觉 */
+      if (!!m.help !== !!s.help) s.helpAt = m.help ? Date.now() : 0;
       s.help = !!m.help;
       s.seen = Date.now();
       /* 先判定积分（可能刚有人过关 / 全组冲线），再重绘 —— 反了会闪「分已上榜、进度还是旧的」。
@@ -1145,6 +1279,15 @@ const T = {
       if (m.t === 'join') this.hb();     // 新生进来立刻把当前状态推给他
       return;
     }
+    /* 手机加分台：手机只发「哪组加几分」，落账永远在教师机这一侧，
+       所以两台手机同时点、手机和教师机同时点，都不会各算各的 */
+    if (m.t === 'mscore') {
+      const g = Math.round(+m.g || 0), d = Math.round(+m.d || 0);
+      /* 手机页可能是旧页面（老师改过组数），越界一律丢掉，别把 gpts 写脏 */
+      if (g >= 1 && g <= this.cfg.groups && d) this.addScore(g, d, true);
+      return;
+    }
+    if (m.t === 'askpts') { this.broadcastPts(); return; }
     if (m.t === 'bye') { delete this.stu[m.id]; this.render(); }
   },
 
@@ -1226,7 +1369,8 @@ const T = {
       }
       const full = mem.filter(s => (s.done || 0) >= L).length;
       h += '<span class="wtot">' + full + '/' + mem.length + '</span>' +
-        '<span class="wpts">' + (mem.length ? this.gTotal(gi) : '—') + '</span></div>';
+        /* 没人也照显示分数：老师可以先给分、人后到；真 0 分才画破折号 */
+        '<span class="wpts">' + ((mem.length || this.gTotal(gi)) ? this.gTotal(gi) : '—') + '</span></div>';
     }
     setHTML(box, h);
   },
@@ -1318,13 +1462,27 @@ const T = {
     this.renderRank();
   },
 
+  /* 老师点一下＝「这道题他答了」：把人从队列里划掉，并通知该学生取消举手态 */
+  helpOK(id) {
+    if (this.stu[id]) { this.stu[id].help = false; this.stu[id].helpAt = 0; }
+    Sync.send({ t: 'helpok', id: id });
+    this.render();
+  },
+
+  /* 举手抢答：谁先举谁排前面，名字前挂顺序号 —— 老师照着号点人，
+     不用每次都问「谁先举的」。放下再举会排到队尾。 */
   renderHelp(arr, online) {
     const box = $('#t-help');
     if (!box) return;
-    const hs = arr.filter(s => s.help && this.online(s));
+    const hs = arr.filter(s => s.help && this.online(s))
+      .sort((a, b) => (a.helpAt || 0) - (b.helpAt || 0));
     if (!hs.length) { setHTML(box, '<div class="ph-sub">没人举手</div>'); return; }
-    setHTML(box, hs.map(s =>
-      '<div class="hp"><span class="help-dot"></span>' + esc(s.name) + ' · ' + s.g + '组 · 第 ' + (s.lv || 1) + ' 关</div>').join(''));
+    if (setHTML(box, hs.map((s, i) =>
+      '<div class="hp" data-id="' + esc(s.id) + '" title="点一下＝已请他回答"><span class="hno">' +
+      (i + 1) + '</span>' + esc(s.name) +
+      ' · ' + s.g + '组 · 第 ' + (s.lv || 1) + ' 关</div>').join(''))) {
+      $$('#t-help .hp[data-id]').forEach(el => el.onclick = () => this.helpOK(el.dataset.id));
+    }
   },
 
   renderGroups(arr) {
@@ -1344,10 +1502,12 @@ const T = {
         '<div class="ph-sub" style="font-size:11px;margin:-2px 0 4px">自动 ' + (p.auto || 0) +
         ' · 教师 ' + (p.manual || 0) + (finAt >= 0 ? ' · 冲线' + (finAt + 1) : '') + '</div>' +
         '<div class="gm">' + (mem.length ? mem.map(s => esc(s.name)).join(' · ') : '—') + '</div>' +
-        '<div class="ops"><button data-act="1" data-g="' + g + '">+1</button>' +
-        '<button class="minus" data-act="-1" data-g="' + g + '">−1</button></div></div>';
+        '<div class="ops"><button class="minus" data-act="-1" data-g="' + g + '">−1</button>' +
+        '<button data-act="1" data-g="' + g + '">+1</button>' +
+        '<button data-act="5" data-g="' + g + '">+5</button></div></div>';
     }
     if (setHTML(box, h)) {
+      box.classList.toggle('dense', this.cfg.groups > 9);
       $$('#t-groups .ops button').forEach(b => b.onclick = () => this.addScore(+b.dataset.g, +b.dataset.act));
     }
   },
@@ -1456,7 +1616,7 @@ const T = {
     out.push('【规模】分 ' + G + ' 组；报到 ' + arr.length + ' 人，在线 ' + on
              + ' 人，离线 ' + (arr.length - on) + ' 人');
     out.push('【总体】全通关 ' + all + ' 人；平均每人已过 ' + avg.toFixed(1) + '/' + L.length
-             + ' 关（完成率 ' + Math.round(avg / L.length * 100) + '%）；举手求助 '
+             + ' 关（完成率 ' + Math.round(avg / L.length * 100) + '%）；举手抢答 '
              + arr.filter(s => s.help).length + ' 人');
     out.push('【每关通过人数】');
     let prev = arr.length;
@@ -1485,7 +1645,7 @@ const T = {
     arr.forEach(s => {
       out.push('  ' + this.aiName(s) + '｜' + s.g + '｜' + (s.done || 0) + '/' + L.length
                + '｜' + (s.score || 0) + '｜第' + (s.lv || 1) + '关｜'
-               + (s.help ? '举手求助' : (this.online(s) ? '在学' : '离线')));
+               + (s.help ? '举手抢答' : (this.online(s) ? '在学' : '离线')));
     });
     if (note) out.push('【老师补充】' + note);
     return out.join('\n');
@@ -1818,19 +1978,7 @@ const T = {
     const target = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'g=' + grp;
     if (this._qrUrl === target) return;      // 地址/组数都没变就别反复重画
     try {
-      const r = QRCode.encode(target, 'M');
-      const n = r.size, q = 4, total = n + q * 2;
-      /* 每模块取整数像素：非整数会让边缘糊成灰，手机更难对焦 */
-      const px = Math.max(4, Math.floor(660 / total));
-      cv.width = cv.height = total * px;
-      const g = cv.getContext('2d');
-      g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
-      g.fillStyle = '#0b1220';
-      for (let y = 0; y < n; y++) {
-        for (let x = 0; x < n; x++) {
-          if (r.modules[y][x]) g.fillRect((x + q) * px, (y + q) * px, px, px);
-        }
-      }
+      this.qrTo(cv, target);
       this._qrUrl = target;
       if (tip) tip.textContent = '扫码直接进学生端，或输 4 位码';
     } catch (e) {
@@ -1842,19 +1990,99 @@ const T = {
 
   /* ---------- 加分 / 清空 / 导出 ---------- */
   /* 教师分：一次点击＝这一组 ±1，不按人数乘（老写法是每人 +1 再求和，6 人组点一下等于 6） */
-  addScore(g, d) {
+  /* 教师分：一次点击只给这一组加这么多分，不按人数乘。
+     （旧写法「每人 +1 再求和」在 6 人组等于一次 +6，人数不对等就失真。） */
+  addScore(g, d, quiet) {
     this.pts(g).manual += d;
     Object.keys(this.stu).forEach(id => {
       const s = this.stu[id];
       if (s.g === g) s.score = (s.score || 0) + d;   // 个人榜照旧每人记一笔，学生看得见
     });
     Sync.send({ t: 'score', g: g, d: d });
+    this.broadcastPts();          // 手机加分台靠这一条重画
     this.render();
+    if (!quiet) toast('第 ' + g + ' 组 ' + (d > 0 ? '+' : '') + d + ' 分');
+  },
+
+  /* 手机页读的是 [auto, manual] 数组（内部那套 {auto,manual} 直接甩过去会读成 0），
+     而且空组也要补 0，否则手机端画出来是「undefined」。 */
+  ptsMap() {
+    const out = {};
+    for (let g = 1; g <= this.cfg.groups; g++) {
+      const p = this.gpts[g] || { auto: 0, manual: 0 };
+      out[g] = [p.auto || 0, p.manual || 0];
+    }
+    return out;
+  },
+  /* 全量分数快照：手机页不需要增量，收到就整块替换，省得对账 */
+  broadcastPts() {
+    Sync.send({ t: 'gpts', n: this.cfg.groups, pts: this.ptsMap(),
+                title: this.cfg.title || '', code: this.code });
+  },
+
+  qrTo(cv, text) { return qrTo(cv, text); },
+
+  /* ---------- 手机加分台二维码 ---------- */
+  /* 码里带课堂码：手机扫进来就知道给哪个班加，不用再输一遍 */
+  paintQRm() {
+    const cv = $('#qrCvM'), tip = $('#qrMTip'), box = $('#qrBoxM');
+    if (!cv) return;
+    const base = (Net.ok && Net.studentUrl) ? Net.studentUrl.replace(/\/s.*$/, '') : '';
+    if (!base || typeof QRCode === 'undefined') {
+      if (box) box.classList.add('none');
+      if (tip) tip.textContent = base ? '还没拿到教师机地址，扫码暂不可用' : '还没有地址，扫码暂不可用';
+      this._qrM = '';
+      return;
+    }
+    const target = base + '/m?code=' + this.code;
+    if (this._qrM === target) return;      // 地址和课堂码都没变就别反复重画
+    if (!this.qrTo(cv, target)) {
+      if (box) box.classList.add('none');
+      if (tip) tip.textContent = '二维码生成失败，让手机输地址进';
+      return;
+    }
+    if (box) box.classList.remove('none');
+    this._qrM = target;
+    /* 地址长得不一样（IP 位数变了），写死文字更稳：完整地址放 title，悬停能看到 */
+    if (tip) { tip.textContent = '扫这里加分 · 课堂码 ' + this.code; tip.title = target; }
+  },
+
+  /* ---------- 本课任务：老师写一次，学生进课堂弹一次 ---------- */
+  taskGet() { return (this.cfg && this.cfg.task) || { title: '', text: '' }; },
+  paintTaskNow() {
+    const el = $('#tkNow');
+    if (!el) return;
+    const t = this.taskGet();
+    el.textContent = t.title ? ('已发布：' + t.title) : '未发布 · 学生进课堂不会弹';
+  },
+  tkOpen() {
+    const t = this.taskGet();
+    if (!t.title && !$('#tkTitleIn').value) { $('#tkTitleIn').value = ''; $('#tkTextIn').value = ''; }
+    else { $('#tkTitleIn').value = t.title || ''; $('#tkTextIn').value = t.text || ''; }
+    $('#tkMsg').textContent = '';
+    $('#tkOv').classList.add('on');
+    setTimeout(() => { const el = $('#tkTitleIn'); if (el) el.focus(); }, 30);
+  },
+  tkClose() { const o = $('#tkOv'); if (o) o.classList.remove('on'); },
+  tkSave() {
+    const title = ($('#tkTitleIn').value || '').trim().slice(0, 30);
+    const text = ($('#tkTextIn').value || '').replace(/\r\n/g, '\n').trim().slice(0, 600);
+    if (!title) { $('#tkMsg').textContent = '标题不能为空'; return; }
+    this.cfg.task = { title: title, text: text };
+    this.persist(); this.paintTaskNow(); this.hb();
+    $('#tkMsg').textContent = '已下发：学生进课堂会弹一次，关掉后点顶栏「任务」再看';
+    toast('任务已发布');
+  },
+  tkClear() {
+    this.cfg.task = { title: '', text: '' };
+    this.persist(); this.paintTaskNow(); this.hb();
+    $('#tkMsg').textContent = '已清空：学生端那个弹窗会自己关掉';
   },
 
   reset() {
     this.stu = {}; this.guests = {};
     this.gpts = {}; this.award = { fin: [], lv: {} };   // 积分与冲线记录一并归零
+    this.broadcastPts();                               // 手机加分台也得跟着归零
     this.open = [1];
     this._tlv = 1;
     this.sec = this.lvSec(1);
@@ -1926,6 +2154,10 @@ const S = {
   id: 's' + Math.random().toString(16).slice(2, 8),
   name: '', g: 1, groups: 8, code: '', lv: 1, done: 0,
   open: [1], sec: 0, run: false, cfg: {}, picked: {}, joined: false,
+  /* 本课任务：_taskShown 记「这次进课堂弹过没有」，进课堂时归零 —— 需求是每次进课堂都弹一次 */
+  task: { title: '', text: '' }, _taskShown: false,
+  /* 举手抢答：老师大屏按「第一次举手」的时刻排队，序号就是抢答顺序 */
+  help: false,
 
   init() {
     /* 扫码进来会带 ?g=<组数>：先按它画，再等大厅把老师的真实组数推过来 */
@@ -1936,6 +2168,14 @@ const S = {
     $('#j-code').onkeydown = e => { if (e.key === 'Enter') $('#j-name').focus(); };
     $('#j-name').onkeydown = e => { if (e.key === 'Enter') this.enter(); };
     $('#cert-close').onclick = () => $('#s-cert').classList.remove('on');
+    $('#s-help').onclick = () => this.toggleHelp();
+    $('#s-task-x').onclick = () => this.taskClose();
+    $('#s-task-nav').onclick = () => {
+      if (this.task.title) this.taskOpen(); else toast('老师还没发布任务');
+    };
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && this.taskIsOpen()) this.taskClose();
+    });
     $('#cert-save').onclick = () => this.saveCert();
     $('#s-cert-nav').onclick = () => {
       const left = CONFIG.LEVELS.length - this.done;
@@ -1989,6 +2229,9 @@ const S = {
     if (!name) { $('#j-msg').textContent = '请填写姓名'; return; }
 
     this.code = code; this.name = name; this.joined = true;
+    /* 每次进课堂都算新的一次：清掉上一节的任务内容和「已弹过」标记，
+       等老师这一轮的心跳把新任务推下来 */
+    this.task = { title: '', text: '' }; this._taskShown = false;
     Lobby.stop();                       // 进课堂后靠本班心跳，不再多占一条连接
     Store.set('last', { name: name, g: this.g, code: code });
 
@@ -2019,6 +2262,7 @@ const S = {
         this.cfg = m.cfg;
         this.paintCourse(this.cfg.title);
         this.applyGroups(this.cfg.groups);
+        this.syncTask();
       }
       this.open = (m.open && m.open.length) ? m.open : [1];
       this.sec = (m.sec == null ? this.sec : m.sec);
@@ -2027,6 +2271,11 @@ const S = {
       if (this.lv > top) this.lv = top;
       this.renderMap();
       this.tick();
+    } else if (m.t === 'helpok' && m.id === this.id) {
+      this.help = false;
+      const b = $('#s-help');
+      if (b) { b.classList.remove('on'); b.textContent = '🙋 举手'; }
+      toast('老师已经点你回答了');
     } else if (m.t === 'cfg' && m.cfg) {
       this.cfg = m.cfg;
       this.applyGroups(this.cfg.groups);
@@ -2034,10 +2283,41 @@ const S = {
     }
   },
 
+  toggleHelp() {
+    this.help = !this.help;
+    this.report({ t: 'help' });
+    const b = $('#s-help');
+    if (b) { b.classList.toggle('on', this.help); b.textContent = this.help ? '🙋 已举手' : '🙋 举手'; }
+    toast(this.help ? '已举手，大屏按先后排队' : '已取消举手');
+  },
+
+  /* ---------- 本课任务 ---------- */
+  syncTask() {
+    const t = (this.cfg && this.cfg.task) || { title: '', text: '' };
+    const title = String(t.title || '').trim();
+    const text = String(t.text || '');
+    const changed = title !== this.task.title || text !== this.task.text;
+    this.task = { title: title, text: text };
+    const nav = $('#s-task-nav');
+    if (nav) nav.hidden = !title;
+    if (!title) { if (this.taskIsOpen()) this.taskClose(); return; }   // 老师清空了，弹窗自己收
+    /* 只弹两种：这次进课堂还没弹过，或者老师改了内容。关掉之后不再骚扰 */
+    if (changed || !this._taskShown) { this._taskShown = true; this.taskOpen(); }
+  },
+  taskIsOpen() { const o = $('#s-task-mask'); return !!o && o.classList.contains('on'); },
+  taskOpen() {
+    if (!this.task.title) return;
+    $('#s-task-title').textContent = this.task.title;
+    /* 先 esc 再按换行切段：老师可能贴进来带尖括号的内容 */
+    $('#s-task-text').innerHTML = esc(this.task.text).replace(/\n/g, '<br>');
+    $('#s-task-mask').classList.add('on');
+  },
+  taskClose() { const o = $('#s-task-mask'); if (o) o.classList.remove('on'); },
+
   report(extra) {
     Sync.send(Object.assign({
       t: 'prog', id: this.id, name: this.name, g: this.g,
-      lv: this.lv, done: this.done, help: false
+      lv: this.lv, done: this.done, help: !!this.help
     }, extra || {}));
   },
 

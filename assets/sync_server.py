@@ -3,8 +3,10 @@
 
 干三件事：
   1. 把本目录静态托管出去 —— 学生用 http://<教师机IP>:8099/s 打开就自动内网直连
-  2. GET  /events?channel=<频道>   SSE 下行
-  3. POST /send                    JSON 广播给同频道其他人
+  2. GET  /s、/t、/m               短地址：学生端 / 教师端 / 手机加分台
+  3. GET  /events?channel=<频道>   SSE 下行
+  4. POST /send                    JSON 广播给同频道其他人
+  5. POST /api/llm                 学情 AI 分析：转发到厂商，三家协议归一化成一种 SSE
 
 与页面里 Sync 对象逐字对齐：
   POST /send  body  {"channel":"…","data":"<消息JSON字符串>","sender":"<发送者ID>"}
@@ -477,6 +479,13 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._json(404, {"ok": False, "err": "未找到教师端 HTML"})
             self.path = "/" + quote(f)
             return super().do_GET()
+        # 手机加分台：教师端「加分」页右栏的二维码指向这里
+        if u.path in ("/m", "/mobile"):
+            f = _pick("加分台")
+            if not f:
+                return self._json(404, {"ok": False, "err": "未找到加分台 HTML（构建时漏拷了）"})
+            self.path = "/" + quote(f)
+            return super().do_GET()
         return super().do_GET()
 
     def do_POST(self):
@@ -545,13 +554,17 @@ class Handler(SimpleHTTPRequestHandler):
             files = [f for f in os.listdir(ROOT[0]) if f.lower().endswith(".html")]
         except Exception:
             files = []
-        for f in sorted(files, key=lambda x: (0 if "教师端" in x else (1 if "学生端" in x else 2), x)):
+        for f in sorted(files, key=lambda x: (0 if "教师端" in x else
+                                              1 if "学生端" in x else
+                                              2 if "加分台" in x else 3, x)):
             if "教师端" in f:
                 # 教师机必须走本机回环：局域网 IP 是 http 非安全上下文，浏览器会禁用摄像头
                 url = "http://127.0.0.1:%d/t" % self.server.server_port
-                tag, desc = "教师机打开", "大屏 · 控制台 · 学情 · 授课（摄像头只在本机回环下可用）"
+                tag, desc = "教师机打开", "大屏 · 学情 · 加分 · 控制台（摄像头只在本机回环下可用）"
             elif "学生端" in f:
                 url, tag, desc = "/s", "学生机打开", "输入课堂码报到 · 闯关 · 证书"
+            elif "加分台" in f:
+                url, tag, desc = "/m", "手机加分", "老师手机扫教师端「加分」页的二维码进来"
             else:
                 url, tag, desc = "/" + quote(f), "", "HTML 页面"
             cards.append('<a class="card" href="%s"><b>%s</b><span class="tag">%s</span>'
