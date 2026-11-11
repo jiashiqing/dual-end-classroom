@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""举手抢答 / 加分独立页 / 手机加分台 / 学生端本课任务 —— 四项新功能专项。
+"""举手抢答 / 加分独立页 / 手机遥控台 / 学生端本课任务 —— 四项功能专项。
 
   1. 大屏那块从「举手求助」改成「举手抢答」：按第一次举手的先后编号，
      放下再举要排到队尾；老师点一下就把他划掉，并通知学生
@@ -239,16 +239,16 @@ def main():
         qr = t.js("(() => { const cv = document.getElementById('qrCvM'); return cv && cv.width > 10 ? cv.toDataURL('image/png') : ''; })()")
         txt = decode_qr(qr) if qr else ""
         if txt:
-            chk("/m?code=" + str(code) in txt, "二维码解出来确实是加分台地址 · %s" % txt)
+            chk("/m?code=" + str(code) in txt, "二维码解出来确实是遥控台地址 · %s" % txt)
         else:
             print("  --   二维码解码跳过（没装 opencv）")
         t.shot(os.path.join(d, "_score_page.png"))
 
-        # ---------------------------------------------------- 3 手机加分台
-        print("\n[3] 手机加分台 /m?code=%s" % code)
+        # ---------------------------------------------------- 3 手机遥控台
+        print("\n[3] 手机遥控台 /m?code=%s" % code)
         with urllib.request.urlopen(base + "/m?code=%s" % code, timeout=5) as resp:
             body = resp.read().decode("utf-8")
-        chk(resp.status == 200 and "小组加分台" in body, "/m 能打开加分台（%d 字节）" % len(body))
+        chk(resp.status == 200 and "课堂遥控台" in body, "/m 能打开遥控台（%d 字节）" % len(body))
 
         m = Browser(free_port(), prof[2], base + "/m?code=%s" % code, w=430, h=932)
         time.sleep(1.4)

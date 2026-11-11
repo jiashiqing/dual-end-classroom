@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<!--
+  课堂遥控台 · 手机端（教师机「加分」页右栏 / 控制台「课堂运行」的二维码指向这里：/m?code=2048）
+  ------------------------------------------------------------------------------------------
+  为什么单独做一个页面，而不是让手机打开教师端：
+  教师端是给投屏用的整页布局，手机上是缩成一张看不清的图，按钮根本点不准；
+  而且教师端要投屏、要开摄像头，不该在手机浏览器里再开一份。
+
+  一个码管三件事（老师站到学生旁边就不用回讲台）：
+    ① 计时：开始 / 暂停 · +5 分钟 · 归零
+    ② 逐关开放：点第 N 关就放行/收回，学生端立刻解锁
+    ③ 小组加分：−1 / +1 / +5
+
+  数据流（教师机是唯一记账方，手机只递意图）：
+    手机 POST /send {t:'mscore',g,d}  加几分     → 教师机 addScore()
+         POST /send {t:'mlv',lv,on}   放行哪关   → 教师机 remoteLv()
+         POST /send {t:'mtimer',act}  计时动作   → 教师机 remoteTimer()
+    教师机落账后广播：
+         {t:'gpts',n,pts}                分数（这一页据它重画）
+         {t:'ctl',open,sec,run,mins,lv}  关卡与计时（立刻，不等心跳）
+         心跳 {t:'hb'} 里也各带一份，漏一条也能 3 秒内自己补上。
+  两台手机同时点、或者手机和教师机同时点，都不会各算各的。
+
+  零依赖、零外链：只在本机服务器下工作（相对路径 /send、/events）。
+  注意：这个注释里不能出现「连续两个减号 + 右尖括号」，否则注释会被浏览器提前
+  截断，整段变成页面正文（踩过，手机上顶着一大段说明文字）。
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F4F8F6">
+<title>课堂遥控台</title>
+<style>
+  :root{
+    --bg:#F4F8F6; --card:#FFFFFF; --line:#E1EAE5; --ink:#17281F;
+    --muted:#6B7D74; --main:#16794F; --main-2:#0F5C3B; --warn:#C2410C;
+    --gold:#B8860B; --goldbg:#FDF8E6; --blue:#1B6FBF;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    padding:0 0 calc(66px + env(safe-area-inset-bottom));
+  }
+  header{padding:12px 16px 9px}
+  .h1{display:flex;align-items:baseline;gap:9px}
+  .h1 b{font-size:20px;letter-spacing:.01em}
+  .h1 i{font-style:normal;font-size:13px;color:var(--muted);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  .sub{display:flex;align-items:center;gap:7px;margin-top:5px;font-size:13px;color:var(--muted)}
+  .dot{width:9px;height:9px;border-radius:50%;background:#B9C6C0;flex:0 0 auto}
+  .dot.on{background:var(--main);box-shadow:0 0 0 4px rgba(22,121,79,.14)}
+  .code{margin-left:auto;flex:0 0 auto;font-size:13px;color:var(--main-2);font-weight:700;
+    font-variant-numeric:tabular-nums}
+  .warn{color:var(--warn)}
+
+  /* 计时条钉在顶部：翻到下面给组加分时也看得见还剩多久 */
+  .bar{
+    position:sticky;top:0;z-index:8;display:flex;align-items:center;gap:8px;
+    padding:8px 12px;background:rgba(244,248,246,.96);
+    border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+    backdrop-filter:blur(8px);
+  }
+  .clk{font-size:29px;font-weight:900;line-height:1;color:var(--ink);
+    font-variant-numeric:tabular-nums;letter-spacing:.01em}
+  .bar.run .clk{color:var(--main)}
+  .lvtag{flex:0 0 auto;font-size:12px;font-weight:700;color:var(--blue);
+    border:1px solid #BBD8F2;background:#EFF7FE;border-radius:6px;padding:2px 5px;
+    line-height:1.3;white-space:nowrap}
+  .bar .sp{flex:1 1 auto}
+  .bar button{
+    flex:0 0 auto;height:40px;padding:0 12px;border-radius:11px;cursor:pointer;
+    font-family:inherit;font-size:15px;font-weight:800;
+    border:1px solid var(--line);background:#FBFDFB;color:var(--ink);
+    transition:transform .06s ease,background .12s ease;
+  }
+  .bar button:active{transform:scale(.95)}
+  #bRun{background:#EAF7F0;border-color:#BFE3D0;color:var(--main-2)}
+  .bar.run #bRun{background:#FDEFE6;border-color:#F0C6A6;color:#A94A12}
+
+  main{padding:10px 12px 22px;display:grid;gap:10px}
+
+  .c{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px 14px 13px}
+  .c.lead{border-color:#E8D48A;background:var(--goldbg)}
+  .chd{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .chd b{font-size:16px;font-weight:800}
+  .chd em{font-style:normal;margin-left:auto;font-size:13px;color:var(--muted)}
+
+  /* 五关：一行摆下，按一下就是放行/收回 */
+  .lvrow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}
+  .lv{
+    height:52px;border-radius:12px;cursor:pointer;font-family:inherit;
+    border:1px solid var(--line);background:#FBFDFB;color:var(--muted);
+    font-size:14px;font-weight:800;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:1px;
+    transition:transform .06s ease,background .12s ease,border-color .12s ease;
+  }
+  .lv i{font-style:normal;font-size:10px;font-weight:600;opacity:.85}
+  .lv:active{transform:scale(.96)}
+  .lv.on{background:#EAF7F0;border-color:#9FD3B8;color:var(--main-2)}
+  .allrow{display:flex;gap:8px;margin-top:9px}
+  .allrow button{
+    flex:1 1 0;height:42px;border-radius:11px;cursor:pointer;font-family:inherit;
+    border:1px solid var(--line);background:#FBFDFB;color:var(--muted);
+    font-size:15px;font-weight:700;
+  }
+  .allrow button:active{transform:scale(.97)}
+
+  .hd{display:flex;align-items:center;gap:8px}
+  .hd .gn{font-size:19px;font-weight:800}
+  .c.lead .gn{color:var(--gold)}
+  .hd .tag{font-size:11px;font-weight:700;color:var(--gold);border:1px solid #E8D48A;
+    border-radius:6px;padding:1px 5px;line-height:1.4}
+  .hd .n{margin-left:auto;font-size:32px;font-weight:900;line-height:1;
+    color:var(--main);font-variant-numeric:tabular-nums}
+  .c.lead .n{color:var(--gold)}
+  .mem{margin-top:4px;font-size:12px;color:var(--muted);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ops{display:flex;gap:8px;margin-top:10px}
+  .ops button{
+    flex:1 1 0;height:54px;border-radius:13px;cursor:pointer;font-family:inherit;
+    border:1px solid var(--line);background:#FBFDFB;color:var(--ink);
+    font-size:18px;font-weight:800;transition:transform .06s ease,background .12s ease;
+  }
+  .ops button:active{transform:scale(.96)}
+  .ops .minus{color:var(--warn)}
+  .ops .plus{background:#EAF7F0;border-color:#BFE3D0;color:var(--main-2)}
+  .ops .big{background:#D9F0E4;border-color:#9FD3B8}
+
+  footer{
+    position:fixed;left:0;right:0;bottom:0;padding:10px 16px calc(10px + env(safe-area-inset-bottom));
+    background:rgba(244,248,246,.96);border-top:1px solid var(--line);
+    font-size:12px;color:var(--muted);text-align:center;
+  }
+  .empty{padding:40px 18px;text-align:center;color:var(--muted);font-size:15px;line-height:1.7}
+  .toast{
+    position:fixed;left:50%;bottom:80px;transform:translate(-50%,18px);
+    padding:11px 20px;border-radius:13px;background:var(--main-2);color:#fff;
+    font-size:16px;font-weight:700;opacity:0;pointer-events:none;
+    transition:opacity .18s ease,transform .18s ease;z-index:20;
+  }
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<header>
+  <div class="h1"><b>课堂遥控台</b><i id="course">—</i><span class="code" id="code">课堂码 ——</span></div>
+  <div class="sub"><span class="dot" id="dot"></span><span id="net">连接中…</span></div>
+</header>
+
+<div class="bar" id="bar">
+  <span class="clk" id="clk">--:--</span>
+  <span class="lvtag" id="lvtag">第 1 关</span>
+  <span class="sp"></span>
+  <button id="bRun">▶ 开始</button>
+  <button id="bAdd">+5</button>
+  <button id="bZero">归零</button>
+</div>
+
+<main>
+  <div class="c">
+    <div class="chd"><b>逐关开放</b><em id="lvHint">已开放 1 / 5 关</em></div>
+    <div class="lvrow" id="lvRow"></div>
+    <div class="allrow">
+      <button id="bAll">全部开启</button>
+      <button id="bNone">全部关闭</button>
+    </div>
+  </div>
+  <div id="list"><div class="empty">正在和教师机同步…</div></div>
+</main>
+
+<footer>加分 · 放行 · 计时一个码全包 · 分数与关卡都以教师机为准</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* 频道前缀必须和 app.src.html 里 Sync.channel 完全一致，否则两边各说各话 */
+  var PREFIX = 'de_v1_';
+  var MYID = 'm' + Math.random().toString(16).slice(2, 10);
+  var qs = new URLSearchParams(location.search);
+  var code = (qs.get('code') || '').replace(/\D/g, '').slice(0, 4);
+  var CH = PREFIX + code;
+  var NLV = 5;                       // 关卡数：教师端也是 5 关，多出来的忽略
+
+  var state = {
+    n: 0, pts: {}, open: [1], sec: 0, run: false, mins: [],
+    title: '', online: false, synced: false
+  };
+  var lastSig = '';
+
+  var $list = document.getElementById('list');
+  var $dot = document.getElementById('dot');
+  var $net = document.getElementById('net');
+  var $code = document.getElementById('code');
+  var $course = document.getElementById('course');
+  var $toast = document.getElementById('toast');
+  var $bar = document.getElementById('bar');
+  var $clk = document.getElementById('clk');
+  var $lvtag = document.getElementById('lvtag');
+  var $bRun = document.getElementById('bRun');
+  var $bAdd = document.getElementById('bAdd');
+  var $bZero = document.getElementById('bZero');
+  var $lvRow = document.getElementById('lvRow');
+  var $lvHint = document.getElementById('lvHint');
+  var toastT = 0;
+
+  function toast(msg) {
+    $toast.textContent = msg;
+    $toast.classList.add('on');
+    clearTimeout(toastT);
+    toastT = setTimeout(function () { $toast.classList.remove('on'); }, 1400);
+  }
+  function buzz() { if (navigator.vibrate) { try { navigator.vibrate(12); } catch (e) {} } }
+
+  function paintNet() {
+    $dot.className = 'dot' + (state.online ? ' on' : '');
+    $net.textContent = state.online ? '已连上教师机' : '没连上教师机 —— 点了发不出去';
+    $net.className = state.online ? '' : 'warn';
+  }
+
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function fmt(s) {
+    s = Math.max(0, Math.round(+s || 0));
+    return pad(Math.floor(s / 60)) + ':' + pad(s % 60);
+  }
+
+  function total(g) {
+    var p = state.pts[g] || [0, 0];
+    return (+p[0] || 0) + (+p[1] || 0);
+  }
+  function leadGroup() {
+    var best = 0, bg = 0;
+    for (var g = 1; g <= state.n; g++) {
+      var t = total(g);
+      if (t > best) { best = t; bg = g; }
+    }
+    return best > 0 ? bg : 0;
+  }
+  function curLv() {
+    var o = (state.open || []).slice().sort(function (a, b) { return a - b; });
+    return o.length ? o[o.length - 1] : 1;
+  }
+  function lvSec(lv) {
+    var m = Math.round(+state.mins[lv - 1]);
+    if (!(m >= 1 && m <= 90)) m = 12;
+    return m * 60;
+  }
+
+  /* 计时条：本地每秒走一格，心跳/ctl 一到就按教师机的值校一次。
+     手机上要的是「看着在动」，秒数准不准由教师机说了算。 */
+  function paintTime() {
+    var lv = curLv();
+    $clk.textContent = state.synced ? fmt(state.sec) : '--:--';
+    $lvtag.textContent = '第 ' + lv + ' 关';
+    $bar.className = 'bar' + (state.run ? ' run' : '');
+    $bRun.textContent = state.run ? '⏸ 暂停' : '▶ 开始';
+  }
+  function paintLv() {
+    var html = '';
+    for (var i = 1; i <= NLV; i++) {
+      var on = (state.open || []).indexOf(i) >= 0;
+      html += '<button class="lv' + (on ? ' on' : '') + '" data-lv="' + i + '">'
+        + '第' + i + '关<i>' + (on ? '已开放' : '锁着') + '</i></button>';
+    }
+    $lvRow.innerHTML = html;
+    $lvHint.textContent = '已开放 ' + (state.open || []).length + ' / ' + NLV + ' 关';
+  }
+
+  function renderCards() {
+    if (!code) {
+      $list.innerHTML = '<div class="empty">地址里没有课堂码。<br>请重新扫教师机上的二维码。</div>';
+      return;
+    }
+    if (!state.n) { $list.innerHTML = '<div class="empty">等教师机回传组数…</div>'; return; }
+    /* 分数没变就不重建：每 3 秒一次全量重画会让正在按的手指落空 */
+    var sig = state.n + '|' + JSON.stringify(state.pts);
+    if (sig === lastSig) return;
+    lastSig = sig;
+
+    var lead = leadGroup(), html = '';
+    for (var g = 1; g <= state.n; g++) {
+      var isLead = (g === lead);
+      var p = state.pts[g] || [0, 0];
+      html += '<div class="c' + (isLead ? ' lead' : '') + '" data-g="' + g + '">'
+        + '<div class="hd"><span class="gn">第' + g + '组</span>'
+        + (isLead ? '<span class="tag">领先</span>' : '')
+        + '<span class="n">' + total(g) + '</span></div>'
+        + '<div class="mem">自动 ' + ((+p[0]) || 0) + ' · 教师 ' + ((+p[1]) || 0) + '</div>'
+        + '<div class="ops">'
+        + '<button class="minus" data-d="-1">−1</button>'
+        + '<button class="plus" data-d="1">+1</button>'
+        + '<button class="plus big" data-d="5">+5</button>'
+        + '</div></div>';
+    }
+    $list.innerHTML = html;
+  }
+
+  function send(obj) {
+    try {
+      fetch('/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel: CH, sender: MYID, data: JSON.stringify(obj) })
+      }).catch(function () {});
+    } catch (e) {}
+  }
+
+  /* 本地先动一下，等教师机广播回来再对齐：手机在教室后排，
+     等 3 秒心跳才变会以为没点上，反手又点一次。 */
+  function needNet() {
+    if (!state.online) { toast('还没连上教师机，等一下再点'); return false; }
+    return true;
+  }
+
+  /* ---------- 计时 ---------- */
+  $bRun.onclick = function () {
+    if (!needNet()) return;
+    state.run = !state.run;
+    state.synced = true;
+    paintTime();
+    send({ t: 'mtimer', act: 'toggle' });
+    buzz();
+    toast(state.run ? '开始计时' : '暂停计时');
+  };
+  $bAdd.onclick = function () {
+    if (!needNet()) return;
+    state.sec += 300; state.synced = true;
+    paintTime();
+    send({ t: 'mtimer', act: 'add' });
+    buzz();
+    toast('加 5 分钟');
+  };
+  $bZero.onclick = function () {
+    if (!needNet()) return;
+    state.run = false;
+    state.sec = lvSec(curLv()); state.synced = true;
+    paintTime();
+    send({ t: 'mtimer', act: 'reset' });
+    buzz();
+    toast('计时归零 · ' + fmt(state.sec));
+  };
+
+  /* ---------- 逐关开放 ---------- */
+  $lvRow.onclick = function (ev) {
+    var b = ev.target.closest('.lv');
+    if (!b) return;
+    if (!needNet()) return;
+    var lv = +b.getAttribute('data-lv');
+    var i = state.open.indexOf(lv);
+    var want = i < 0;
+    if (want) state.open.push(lv);
+    else state.open.splice(i, 1);
+    state.open.sort(function (a, b2) { return a - b2; });
+    paintLv(); paintTime();
+    send({ t: 'mlv', lv: lv, on: want ? 1 : 0 });
+    buzz();
+    toast('第 ' + lv + ' 关 ' + (want ? '已开放' : '已收回'));
+  };
+  document.getElementById('bAll').onclick = function () { sendAll(1); };
+  document.getElementById('bNone').onclick = function () { sendAll(0); };
+  function sendAll(on) {
+    if (!needNet()) return;
+    state.open = [];
+    if (on) for (var i = 1; i <= NLV; i++) state.open.push(i);
+    paintLv();
+    send({ t: 'mlv', all: on ? 1 : 0 });
+    buzz();
+    toast(on ? '全部关卡已开放' : '所有关卡已关闭');
+  }
+
+  /* ---------- 加分 ---------- */
+  $list.addEventListener('click', function (ev) {
+    var b = ev.target.closest('.ops button');
+    if (!b) return;
+    var card = b.closest('.c');
+    if (!card) return;
+    var g = +card.getAttribute('data-g'), d = +b.getAttribute('data-d');
+    if (!needNet()) return;
+    if (!state.pts[g]) state.pts[g] = [0, 0];
+    state.pts[g][1] = (+state.pts[g][1] || 0) + d;
+    lastSig = '';
+    renderCards();
+    send({ t: 'mscore', g: g, d: d });
+    buzz();
+    toast('第' + g + '组 ' + (d > 0 ? '+' : '') + d + ' 分');
+  });
+
+  function pullCtl(m) {
+    if (m.open) state.open = m.open.slice();
+    if (m.mins && m.mins.length) state.mins = m.mins;
+    if (m.sec != null) state.sec = +m.sec;
+    if (m.run != null) state.run = !!m.run;
+    state.synced = true;
+    paintLv(); paintTime();
+  }
+
+  function onData(raw) {
+    var d;
+    try { d = JSON.parse(raw); } catch (e) { return; }
+    if (!d) return;
+    /* /send 广播回来的是 {sender, data}，data 里才是我们自己发的 JSON 字符串 */
+    var m;
+    try { m = (typeof d.data === 'string') ? JSON.parse(d.data) : d; } catch (e) { return; }
+    if (!m || !m.t) return;
+    /* 自己发的消息会被原样广播回来，不去重会把本地加的那一分加两遍 */
+    if (d.sender === MYID && d.sender) return;
+
+    if (m.t === 'ctl') {
+      pullCtl(m);
+      if (m.n) state.n = m.n;
+      if (m.title) { state.title = m.title; $course.textContent = m.title; }
+      return;
+    }
+    if (m.t === 'gpts') {
+      if (m.pts) state.pts = m.pts;
+      if (m.n) state.n = m.n;
+      if (m.title) { state.title = m.title; $course.textContent = m.title; }
+      lastSig = '';
+      renderCards();
+      return;
+    }
+    if (m.t === 'hb') {
+      pullCtl(m);
+      if (m.cfg) {
+        if (m.cfg.mins) state.mins = m.cfg.mins;
+        if (m.cfg.groups) state.n = +m.cfg.groups;
+        if (m.cfg.title) { state.title = m.cfg.title; $course.textContent = m.cfg.title; }
+      }
+      if (m.pts) state.pts = m.pts;
+      lastSig = '';
+      renderCards();
+    }
+  }
+
+  function connect() {
+    if (!code) return;
+    var es = new EventSource('/events?channel=' + encodeURIComponent(CH));
+    es.onopen = function () {
+      state.online = true; paintNet();
+      send({ t: 'askpts' });        // 别等 3 秒心跳，进来就要一份分数 + 关卡 + 计时
+    };
+    es.onerror = function () { state.online = false; paintNet(); };
+    es.onmessage = function (ev) { onData(ev.data); };
+  }
+
+  if (code) {
+    $code.textContent = '课堂码 ' + code;
+    document.title = '遥控台 · ' + code;
+  }
+  $course.textContent = state.title || '双端课堂';
+  paintNet();
+  paintLv();
+  paintTime();
+  renderCards();
+  connect();
+
+  /* 本地秒表：屏幕上的数字得自己在走，不然看着像卡死了 */
+  setInterval(function () {
+    if (state.run && state.sec > 0) { state.sec--; paintTime(); }
+  }, 1000);
+
+  /* 断线不用管：EventSource 按服务器给的 retry 自己重连，连回来会重新 onopen
+     （顺手再要一份状态）。别再手动 connect，否则每 5 秒叠一个 EventSource，
+     同一份数据会收到好几遍。 */
+})();
+</script>
+</body>
+</html>

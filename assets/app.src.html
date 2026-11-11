@@ -323,6 +323,17 @@ table.roster tr:hover td{background:#fbfdfb}
 .qr-box.none{display:none}
 .qr-box canvas{width:100%;height:100%;display:block;image-rendering:pixelated}
 .qr-tip{text-align:center;color:var(--muted);font-size:13px}
+/* 手机遥控块：控制台「课堂运行」里那张小码，和「加分」页的大码是同一个地址
+   （/m?code=xxxx），扫一次就能加分 + 逐关开放 + 计时。 */
+.qr-box.sm{width:92px;height:92px;margin:0;padding:4px;flex:0 0 auto}
+.mqr{display:flex;align-items:center;gap:12px;margin:10px 0 2px;padding:9px 12px;
+  border:1px dashed var(--line);border-radius:12px;background:#f7fbf8}
+.mqr.none{display:none}
+.mqr-tx{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
+.mqr-tx b{font-size:14px}
+.mqr-tx span{font-size:13px;color:var(--muted)}
+.mqr-tx em{font-style:normal;font-size:12px;color:var(--main-2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .stu-url{margin-top:8px;text-align:center}
 /* 地址长度是变数（192.168.3.87 与 192.168.100.100 差 4 个字符），绝不折行 */
 .stu-url #stuUrlTx{display:block;font:700 18px/1.35 ui-monospace,Consolas,monospace;color:var(--main-2);
@@ -551,8 +562,8 @@ table.roster tr:hover td{background:#fbfdfb}
           <div class="sc-foot">点一下只给这一组加这么多分，不按人数乘 · 下课在「学情」页导出小组积分</div>
         </div>
         <div class="sp sc-qr">
-          <h4>手机加分</h4>
-          <div class="sub">同一 WiFi 扫码，手机当遥控器</div>
+          <h4>手机遥控</h4>
+          <div class="sub">同一 WiFi 扫码，加分 · 逐关开放 · 计时都能遥控</div>
           <div class="qr-box none" id="qrBoxM"><canvas id="qrCvM" width="240" height="240">二维码</canvas></div>
           <div class="qr-tip" id="qrMTip">—</div>
         </div>
@@ -584,10 +595,20 @@ table.roster tr:hover td{background:#fbfdfb}
             <button class="btn ghost" id="t-zero">计时归零</button>
             <button class="btn ghost" id="t-reset">清空课堂数据</button>
           </div>
+          <!-- 手机遥控：站到学生旁边也能放行下一关、加 5 分钟、给隔壁组补分，不用回讲台 -->
+          <div class="mqr" id="mqrBox">
+            <div class="qr-box sm none" id="qrBoxS"><canvas id="qrCvS" width="200" height="200">二维码</canvas></div>
+            <div class="mqr-tx">
+              <b>手机遥控</b>
+              <span>扫这个码：加分 · 逐关开放 · 计时</span>
+              <em id="qrSTip">—</em>
+            </div>
+          </div>
           <div class="lv-list" id="lvCtrl"></div>
         </div>
         <div class="ph-sub" style="margin-top:10px">
-          给小组加减分搬到顶栏「加分」页了 —— 课上会反复点，挂在控制台里要点两层；那一页还能用手机扫二维码加。
+          给小组加减分搬到顶栏「加分」页了 —— 课上会反复点，挂在控制台里要点两层；
+          那一页右栏的码和上面这张是同一个，手机扫一次就能加分、放行、控计时。
         </div>
       </div>
 
@@ -1089,8 +1110,10 @@ const T = {
       /* 全屏看板盖住整个视口，切页签时先收掉，不然它会挂在新页上 */
       if (this.wallAll) this.wallAllOff();
       if (this.aiIsOpen()) this.aiClose();
-      /* 加分页隐藏时也能画卡，但二维码要等有地址才画得出来，切过去补一次 */
+      /* 加分页隐藏时也能画卡，但二维码要等有地址才画得出来，切过去补一次；
+         控制台那张小码同理（两页画的是同一个 /m 地址） */
       if (tab === 'score') { this.renderGroups(this.list()); this.paintQRm(); }
+      if (tab === 'ctrl') this.paintQRm();
     });
 
     $('#btnWallAll').onclick = () => this.wallAllOn();
@@ -1231,6 +1254,45 @@ const T = {
     this.hb();
   },
 
+  /* ---------- 手机遥控（一个码：加分 + 放行 + 计时） ---------- */
+  /* m.on 给了就照办，没给就当成取反；越界（组数/关数改过、页面过期）一律丢掉 */
+  remoteLv(m) {
+    const max = CONFIG.LEVELS.length;
+    if (m.all != null) {
+      this.open = m.all ? CONFIG.LEVELS.map(L => L.id) : [];
+    } else {
+      const id = Math.round(+m.lv || 0);
+      if (id < 1 || id > max) return;
+      const i = this.open.indexOf(id);
+      const want = (m.on == null) ? (i < 0) : !!m.on;
+      if (want && i < 0) this.open.push(id);
+      else if (!want && i >= 0) this.open.splice(i, 1);
+      this.open.sort((a, b) => a - b);
+    }
+    this.afterOpen();
+    this.bcCtl();          // 手机那台要立刻看到新状态，别等下一次 3 秒心跳
+  },
+
+  remoteTimer(act) {
+    if (act === 'toggle') {
+      this.run = !this.run; this.paintTimerBtn(); this.tick(); this.hb();
+    } else if (act === 'add') {
+      this.sec += 300; this.tick(); this.hb(); toast('已加 5 分钟（手机）');
+    } else if (act === 'reset') {
+      this.sec = this.lvSec(this.curLv()); this.run = false;
+      this.paintTimerBtn(); this.tick(); this.hb(); toast('计时归零（手机）');
+    } else return;
+    this.bcCtl();
+  },
+
+  /* 遥控状态广播：关卡 / 剩余秒数 / 是否在跑 / 每关时长。
+     mins 必须带 —— 手机上「归零」要算该回到多少秒，光有 sec 不够。 */
+  bcCtl() {
+    Sync.send({ t: 'ctl', open: this.open, sec: this.sec, run: !!this.run,
+                lv: this.curLv(), mins: (this.cfg.mins || []).slice(),
+                n: this.cfg.groups, title: this.cfg.title || '', code: this.code });
+  },
+
   renderLvCtrl() {
     const box = $('#lvCtrl');
     if (!box) return;
@@ -1279,7 +1341,7 @@ const T = {
       if (m.t === 'join') this.hb();     // 新生进来立刻把当前状态推给他
       return;
     }
-    /* 手机加分台：手机只发「哪组加几分」，落账永远在教师机这一侧，
+    /* 手机遥控台：手机只发「哪组加几分」，落账永远在教师机这一侧，
        所以两台手机同时点、手机和教师机同时点，都不会各算各的 */
     if (m.t === 'mscore') {
       const g = Math.round(+m.g || 0), d = Math.round(+m.d || 0);
@@ -1287,7 +1349,11 @@ const T = {
       if (g >= 1 && g <= this.cfg.groups && d) this.addScore(g, d, true);
       return;
     }
-    if (m.t === 'askpts') { this.broadcastPts(); return; }
+    if (m.t === 'askpts') { this.broadcastPts(); this.bcCtl(); return; }
+    /* 手机遥控台：放行关卡 / 控计时。手机只递意图，副作用全在教师机这一侧，
+       走的还是面板按钮那两个方法，不会出现「手机点了、学生端没动」的两套逻辑。 */
+    if (m.t === 'mlv') { this.remoteLv(m); return; }
+    if (m.t === 'mtimer') { this.remoteTimer(m.act); return; }
     if (m.t === 'bye') { delete this.stu[m.id]; this.render(); }
   },
 
@@ -1999,7 +2065,7 @@ const T = {
       if (s.g === g) s.score = (s.score || 0) + d;   // 个人榜照旧每人记一笔，学生看得见
     });
     Sync.send({ t: 'score', g: g, d: d });
-    this.broadcastPts();          // 手机加分台靠这一条重画
+    this.broadcastPts();          // 手机遥控台靠这一条重画
     this.render();
     if (!quiet) toast('第 ' + g + ' 组 ' + (d > 0 ? '+' : '') + d + ' 分');
   },
@@ -2022,29 +2088,40 @@ const T = {
 
   qrTo(cv, text) { return qrTo(cv, text); },
 
-  /* ---------- 手机加分台二维码 ---------- */
-  /* 码里带课堂码：手机扫进来就知道给哪个班加，不用再输一遍 */
+  /* ---------- 手机遥控台二维码 ---------- */
+  /* 码里带课堂码：手机扫进来就知道给哪个班用，不用再输一遍。
+     一个码管三件事（加分 / 逐关开放 / 计时），所以「加分」页那张大码和
+     控制台「课堂运行」里那张小码画的是**同一个 URL**，老师站哪页扫都行。 */
   paintQRm() {
-    const cv = $('#qrCvM'), tip = $('#qrMTip'), box = $('#qrBoxM');
-    if (!cv) return;
+    const big = $('#qrCvM'), bigBox = $('#qrBoxM'), bigTip = $('#qrMTip');
+    const small = $('#qrCvS'), smallBox = $('#qrBoxS'), smallTip = $('#qrSTip');
     const base = (Net.ok && Net.studentUrl) ? Net.studentUrl.replace(/\/s.*$/, '') : '';
+    const hide = on => [bigBox, smallBox].forEach(b => { if (b) b.classList.toggle('none', on); });
     if (!base || typeof QRCode === 'undefined') {
-      if (box) box.classList.add('none');
-      if (tip) tip.textContent = base ? '还没拿到教师机地址，扫码暂不可用' : '还没有地址，扫码暂不可用';
+      hide(true);
+      const t = base ? '二维码组件没加载，手机手输地址进' : '还没有教师机地址，扫码暂不可用';
+      if (bigTip) bigTip.textContent = t;
+      if (smallTip) smallTip.textContent = t;
       this._qrM = '';
       return;
     }
     const target = base + '/m?code=' + this.code;
-    if (this._qrM === target) return;      // 地址和课堂码都没变就别反复重画
-    if (!this.qrTo(cv, target)) {
-      if (box) box.classList.add('none');
-      if (tip) tip.textContent = '二维码生成失败，让手机输地址进';
-      return;
+    const short = target.replace(/^https?:\/\//, '');
+    if (this._qrM !== target) {
+      const okBig = this.qrTo(big, target);
+      const okSmall = this.qrTo(small, target);
+      if (!okBig && !okSmall) {
+        hide(true);
+        if (bigTip) bigTip.textContent = '二维码生成失败，让手机输地址进';
+        if (smallTip) smallTip.textContent = '二维码生成失败，让手机输地址进';
+        return;
+      }
+      this._qrM = target;
     }
-    if (box) box.classList.remove('none');
-    this._qrM = target;
+    hide(false);
     /* 地址长得不一样（IP 位数变了），写死文字更稳：完整地址放 title，悬停能看到 */
-    if (tip) { tip.textContent = '扫这里加分 · 课堂码 ' + this.code; tip.title = target; }
+    if (bigTip) { bigTip.textContent = '扫这里遥控 · 课堂码 ' + this.code; bigTip.title = target; }
+    if (smallTip) { smallTip.textContent = short; smallTip.title = target; }
   },
 
   /* ---------- 本课任务：老师写一次，学生进课堂弹一次 ---------- */
@@ -2082,7 +2159,7 @@ const T = {
   reset() {
     this.stu = {}; this.guests = {};
     this.gpts = {}; this.award = { fin: [], lv: {} };   // 积分与冲线记录一并归零
-    this.broadcastPts();                               // 手机加分台也得跟着归零
+    this.broadcastPts();                               // 手机遥控台也得跟着归零
     this.open = [1];
     this._tlv = 1;
     this.sec = this.lvSec(1);

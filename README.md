@@ -6,7 +6,7 @@ WorkBuddy skill：产出「**教师端 + 学生端 + 内网同步服务器**」�
 `sync_server.py`（静态托管 + SSE 下发 + POST 广播）与离线二维码编码器 `qr.js`。
 **全程局域网、断外网可用，数据不经过任何第三方云。**
 
-> 当前版本：**v4 · 2026-11-11**（v4 三件事：**加分独立成页** + 手机扫 `/m` 二维码当遥控器、大屏改**举手抢答**按先后编号、学生端**本课任务**弹窗；v3.1 小组积分：全员通关 10/7/5 + 整组过关每关 +2 + 教师分；v3 学情 AI 分析：12 家厂商、默认 DeepSeek、填个 Key 就能用）
+> 当前版本：**v4.1 · 2026-11-11**（v4.1：手机页从「加分台」升级成**遥控台** —— 一个二维码同时管**加分 / 逐关开放 / 计时**，教师端「加分」页与「控制台 · 课堂运行」两张码同址；v4：加分独立成页、大屏改**举手抢答**按先后编号、学生端**本课任务**弹窗；v3.1 小组积分：全员通关 10/7/5 + 整组过关每关 +2 + 教师分；v3 学情 AI 分析：12 家厂商、默认 DeepSeek、填个 Key 就能用）
 
 ---
 
@@ -51,7 +51,8 @@ python scripts/smoke_sync.py --dir <你的项目>/dist --reclaim
 python scripts/e2e_ui.py --dir <你的项目>/dist      # 需 Edge
 python scripts/probe_ai.py --dir <你的项目>/dist        # 学情 AI（自带假模型）
 python scripts/probe_score.py --dir <你的项目>/dist     # 小组积分
-python scripts/probe_taskscore.py --dir <你的项目>/dist # 加分页 / 手机加分台 / 抢答 / 任务
+python scripts/probe_taskscore.py --dir <你的项目>/dist # 加分页 / 手机 /m 加分 / 抢答 / 任务
+python scripts/probe_remote.py --dir <你的项目>/dist   # 手机遥控：放行 / 全部开合 / 控计时
 
 # 4) 上课
 双击 dist/start_server.bat
@@ -65,7 +66,7 @@ python scripts/probe_taskscore.py --dir <你的项目>/dist # 加分页 / 手机
 ├── SKILL.md                    技能定义（何时用/工作流/硬前提/硬性规则/验收清单）
 ├── assets/
 │   ├── app.src.html            骨架源码（两端合一 + 角色标记，v4）
-│   ├── mobile_score.html       手机加分台（构建时改名「加分台.html」，GET /m 直出）
+│   ├── mobile_remote.html      手机遥控台（构建时改名「遥控台.html」，GET /m 直出）
 │   ├── qr.js                   离线二维码编码器（零依赖，13 KB）
 │   ├── sync_server.py          内网同步服务器（零依赖；Range / netinfo / /api/llm 大模型转发 / 端口顺延）
 │   └── start_server.bat        双击启动（ASCII + CRLF）
@@ -83,7 +84,8 @@ python scripts/probe_taskscore.py --dir <你的项目>/dist # 加分页 / 手机
     ├── e2e_ui.py               真浏览器报到 → 答题 → 上报
     ├── probe_ai.py             学情 AI 分析（自带假模型，不吃真 Key）
     ├── probe_score.py          小组积分（分值 / 幂等 / 两榜 / 清空）
-    └── probe_taskscore.py      加分独立页 / 手机加分台 / 抢答 / 本课任务
+    ├── probe_taskscore.py      加分独立页 / 手机 /m 加分 / 抢答 / 本课任务
+    └── probe_remote.py         手机遥控：放行 / 全部开合 / 控计时 / 布局
 ```
 
 ## 这个技能解决什么

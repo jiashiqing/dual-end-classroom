@@ -100,8 +100,8 @@ def main():
     need = ['qr.js']
     if not a.no_server:
         need += ['sync_server.py', 'start_server.bat']
-        # 手机加分台：/m 由 sync_server 直接返回它，漏拷就是扫码 404
-        need += ['mobile_score.html']
+        # 手机遥控台：/m 由 sync_server 直接返回它，漏拷就是扫码 404
+        need += ['mobile_remote.html']
     for f in need:
         s = os.path.join(ASSETS, f)
         if os.path.isfile(s):
@@ -110,11 +110,11 @@ def main():
         else:
             raise SystemExit('assets 里缺 %s，产物不完整' % f)
 
-    # 手机加分台改名成中文，_pick("加分台") 才找得到（服务器按文件名关键字挑页面）
-    src_m = os.path.join(outdir, 'mobile_score.html')
+    # 手机遥控台改名成中文，_pick("遥控台") 才找得到（服务器按文件名关键字挑页面）
+    src_m = os.path.join(outdir, 'mobile_remote.html')
     if os.path.isfile(src_m):
-        os.replace(src_m, os.path.join(outdir, '加分台.html'))
-        print('  %-22s 已改名（手机加分 /m）' % '加分台.html')
+        os.replace(src_m, os.path.join(outdir, '遥控台.html'))
+        print('  %-22s 已改名（手机遥控 /m：加分 · 放行 · 计时）' % '遥控台.html')
 
     # 引了 qr.js 就必须真的在目录里，否则教师端二维码静默变白框
     for role, label, fname in jobs:
@@ -125,7 +125,7 @@ def main():
 
     print('\n输出目录：%s' % outdir)
     print('启动上课：双击 start_server.bat，学生机开 http://本机IP:8099/s 或扫二维码')
-    print('手机加分：教师端「加分」页右栏二维码，或 http://本机IP:8099/m?code=<课堂码>')
+    print('手机遥控：教师端「加分」页右栏 / 「课堂运行」的二维码，或 http://本机IP:8099/m?code=<课堂码>')
 
 
 if __name__ == '__main__':

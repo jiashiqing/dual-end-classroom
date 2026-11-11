@@ -69,9 +69,10 @@ python scripts/e2e_ui.py --dir dist      # 真浏览器报到→答题→上报�
 python scripts/probe_ai.py --dir dist    # 学情 AI 分析：自带假模型，不用真 Key
 python scripts/probe_score.py --dir dist # 小组积分：分值/幂等/两榜/进度墙积分列/清空
 python scripts/probe_taskscore.py --dir dist # 抢答编号/加分独立页/手机 /m 双向同步/学生端任务弹窗
+python scripts/probe_remote.py --dir dist # 手机遥控：两张码同址 / 放行→学生端解锁 / 全部开合 / 手机控计时 / 1366 不溢出
 ```
 
-六条都绿再交付（`probe_ai` / `probe_score` / `probe_taskscore` 缺 `websocket-client` 会跳过，不算失败）。`--render` 可加在 verify 后做 1366×768 截图。
+七条都绿再交付（`probe_ai` / `probe_score` / `probe_taskscore` / `probe_remote` 缺 `websocket-client` 会跳过，不算失败）。`--render` 可加在 verify 后做 1366×768 截图。
 
 **这三条只覆盖主干**（报到/答题/上报、协议、语法隔离）。课前设置、二维码、改组数、每关时长、详情看板、证书门闩这些「新长出来的 UI」脚本不管——交付前照 `references/05` 的人工清单点一遍，尤其是**用手机真扫一次二维码**。
 
@@ -91,6 +92,7 @@ python scripts/probe_taskscore.py --dir dist # 抢答编号/加分独立页/手�
     ├── 我的课堂-教师端.html    构建产物，只含教师端代码
     ├── 我的课堂_学生端.html    构建产物，只含学生端代码
     ├── qr.js                 构建时一并复制（漏了二维码是空白）
+    ├── 遥控台.html            手机端（加分/放行/计时），GET /m 直出
     ├── sync_server.py        内网同步服务器
     └── start_server.bat      双击启动
 ```
@@ -117,7 +119,7 @@ python scripts/probe_taskscore.py --dir dist # 抢答编号/加分独立页/手�
 17. **AI 分析必须走本机服务器转发，不许页面直连厂商。** OpenAI / 智谱 / 豆包都不给跨域头，浏览器里 `fetch` 直接被 CORS 拦；Key 也会落在页面上下文里。所以 `sync_server.py` 提供 `POST /api/llm`，把 OpenAI / Anthropic / Gemini 三家的 SSE 归一化成 `data:{"t":"增量"}` 再推回来——**换厂商不用改前端**。只放行 https，只有 `127.0.0.1` 才允许 http（否则这台机器成了内网任意请求的跳板）。
 18. **流式响应的 chunked 结束块不能省。** 传完最后一帧要写 `0\r\n\r\n`：不写的话浏览器 `fetch` 读流会把 EOF 当成「连接被掐断」，Python 的 `http.client` 直接抛 `IncompleteRead`（探针就栽在这）。另外**本机地址必须绕过系统代理**直连，机房电脑常年挂着代理，`127.0.0.1` 会被劫走。
 19. **小组积分按「组」记账，判定必须幂等。** 分两本：`gpts[组]={auto, manual}`（`auto` 由规则加、`manual` 由老师点），**总分 = auto + manual**。`auto` 靠 `award.fin`（冲线顺序）和 `award.lv['组-关']` 保证同一件事只发一次；判定只跑在 `join / prog / help` 之后，**学生退出（`bye`）不重判**——否则「最慢的那个人走了」会让剩下的组白捡一个冲线。教师分**一次点击只加 1 分**，不许写成「每人 +1 再求和」：6 人组点一下等于 6 分，人数不对等的班直接失真。
-20. **加分记在教师机，手机只是遥控器。** 手机页（`assets/mobile_score.html` → 产物 `加分台.html`，`GET /m`）只发 `{t:'mscore',g,d}`，**落账永远在教师机**；教师机再广播 `{t:'gpts',n,pts}`（`pts` 是 `{组号:[auto,manual]}` 数组），心跳里也带一份。手机端本地先加一下只为手感，下一帧就被教师机覆盖 —— 别让手机自己记账，否则两台手机各点一下分数就翻倍。**`pts` 必须是数组**：内部那套 `{auto,manual}` 直接发过去，手机端读 `p[0]/p[1]` 会全是 0。
+20. **加分与遥控都记在教师机，手机只是遥控器。** 手机页（`assets/mobile_remote.html` → 产物 `遥控台.html`，`GET /m`，也认 `/score` `/remote`）只发**意图**：加分 `{t:'mscore',g,d}`、放行 `{t:'mlv',lv,on}`（或 `{all:1}`）、计时 `{t:'mtimer',act:'toggle'|'add'|'reset'}`；**落账/改状态永远在教师机**（`addScore` / `remoteLv` / `remoteTimer`，后两个和面板按钮走同一套副作用）。教师机广播 `{t:'gpts',n,pts}`、`{t:'ctl',open,sec,run,mins,lv,n,title}`，心跳 `hb` 里也各带一份。手机端本地先动一下只为手感，下一帧就被教师机覆盖 —— 别让手机自己记账，否则两台手机各点一下分数就翻倍。**`pts` 必须是数组**：内部那套 `{auto,manual}` 直接发过去，手机端读 `p[0]/p[1]` 会全是 0。**`ctl` 里必须带 `mins`**：手机「归零」要靠它算回到多少秒。
 21. **本课任务跟着 `cfg` 走，不另开通道。** `cfg.task={title,text}` 随心跳下发，学生端 `syncTask()` 自己判断：内容变了、或这次进课堂还没弹过 → 弹窗；老师清空 → 弹窗自动收、顶栏「任务」按钮隐藏。别在服务端加任务表，这个场景只需要「最新一份」。
 22. **全屏看板挂舞台根节点，不是内容区。** 内容区可能只有"1080 减顶栏"那么高，铺不满；挂 `#stage`（或 `position:fixed;inset:0`）+ 高 `z-index`，`Esc` 能关，换页/切页签自动收起。
 
@@ -130,7 +132,7 @@ python scripts/probe_taskscore.py --dir dist # 抢答编号/加分独立页/手�
 - [ ] 学生机地址是内网 IP，不是 `127.0.0.1`，也没折行
 - [ ] 分组数 8 → 10：加分页组卡 10 张、进度墙 10 行、学生报到页 3 秒内变 10 个按钮
 - [ ] 举手抢答：三个人依次举手，大屏编号 1/2/3；有人放下再举，排到队尾；点一下从队列消失
-- [ ] 手机加分：手机连同一 WiFi 扫「加分」页二维码，顶部显示「已连上教师机」，点 +1 教师端立刻变
+- [ ] 手机遥控：手机连同一 WiFi 扫「加分」页右栏或「控制台 · 课堂运行」那块码（两张是同一个地址），顶部显示「已连上教师机」；点 +1 教师端立刻变、点第 3 关学生端立刻解锁、点「开始」大屏和学生端倒计时一起走
 - [ ] 本课任务：发布后学生端弹窗，关掉后顶栏「任务」再看得到；清空任务弹窗自己收
 - [ ] 第 2 关设 7 分钟 → 放行后显示「第 2 关 · 07:00」，在同一关反复开关不会重置
 - [ ] 「⛶ 详情」铺满整屏、能滚、`Esc` 关、切页签自动收起
@@ -166,3 +168,4 @@ python scripts/probe_taskscore.py --dir dist # 抢答编号/加分独立页/手�
 | `scripts/probe_ai.py` | 学情 AI 分析专项（假模型起 SSE，验流式/渲染/prompt/401/Esc） |
 | `scripts/probe_score.py` | 小组积分专项（冲线 10/7/5 · 覆盖分只算前 N-1 关 · 教师分不乘人数 · 幂等 · 两榜切换 · 清空） |
 | `scripts/probe_taskscore.py` | 抢答编号与队尾重排 · 加分独立页三列不溢出 · 手机 `/m` 双向同步 · 学生端任务弹窗全流程 |
+| `scripts/probe_remote.py` | 手机遥控专项：两张码同址 · 手机放行→教师端与学生端同步 · 全部开合 · 手机控计时（开始/暂停/+5/归零） · 1366 不溢出 · 手机吸顶不横滚 |

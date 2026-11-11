@@ -8,6 +8,7 @@ dist/
 _shot*.png
 _smoke*/
 __prof*/
+scripts/shots/
 
 # 系统垃圾
 .DS_Store
